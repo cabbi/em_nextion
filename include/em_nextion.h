@@ -1,7 +1,7 @@
 #ifndef __NEXTION
 #define __NEXTION
 
-#include <Arduino.h>
+#include <stdint.h>
 
 #include "em_log.h"
 #include "em_com_device.h"
@@ -104,7 +104,7 @@ private:
 };
 
 class EmNexObject: public EmLog {
-  public:
+public:
     EmNexObject(EmNextion& nex,
                 const char* name,
                 bool logEnabled=false)
@@ -116,38 +116,43 @@ class EmNexObject: public EmLog {
 
     virtual const char* Name() const { return m_name; }
 
-  protected:
+protected:
     const char* m_name;
     EmNextion& m_nex;
 };
 
 class EmNexPage: public EmNexObject
 {
-  public:
+public:
     EmNexPage(EmNextion& nex, 
-              const int id, 
+              const uint8_t id, 
               const char* name,
               bool logEnabled=false)
       : EmNexObject(nex, name, logEnabled),
         m_id(id)
     {}
     
-    const int m_id;
+    uint8_t Id() const {
+        return m_id;
+    }
 
     bool IsCurrent() {
         uint8_t id;
         return m_nex.GetCurPage(id) && id == m_id;
     }
+
+protected:
+    const uint8_t m_id;
 };
 
 class EmNexPageElement: public EmNexObject
 {
-  public:
+public:
     EmNexPageElement(EmNextion& nex,
                      EmNexPage& page, 
                      const char* name,
                      bool logEnabled=false)
-      : EmNexObject(nex, name, logEnabled),
+     : EmNexObject(nex, name, logEnabled),
         m_page(page)
     {}
 
@@ -158,14 +163,14 @@ class EmNexPageElement: public EmNexObject
 class EmNexText: public EmNexPageElement,
                  public EmValueSource<char*>
 {
-  public:
+public:
     EmNexText(EmNextion& nex, 
-              EmNexPage& page, 
-              const char* name,
-              const uint8_t len,
-              bool logEnabled=false)
-      : EmNexPageElement(nex, page, name, logEnabled),
-        EmValueSource<char*>(len)
+                EmNexPage& page, 
+                const char* name,
+                const uint8_t len,
+                bool logEnabled=false)
+     : EmNexPageElement(nex, page, name, logEnabled),
+       EmValueSource<char*>(len)
     {}
 
     virtual bool GetSourceValue(char* value);
@@ -175,13 +180,13 @@ class EmNexText: public EmNexPageElement,
 class EmNexInteger: public EmNexPageElement,
                     public EmValueSource<int32_t>
 {
-    public:
-      EmNexInteger(EmNextion& nex, 
-                   EmNexPage& page, 
-                   const char* name,
-                   bool logEnabled=false)
-        : EmNexPageElement(nex, page, name, logEnabled)
-      {}
+public:
+    EmNexInteger(EmNextion& nex, 
+                EmNexPage& page, 
+                const char* name,
+                bool logEnabled=false)
+     : EmNexPageElement(nex, page, name, logEnabled)
+    {}
 
     virtual bool GetSourceValue(int32_t& value);
     virtual bool SetSourceValue(const int32_t value);
@@ -190,40 +195,42 @@ class EmNexInteger: public EmNexPageElement,
 class EmNexFloat: public EmNexPageElement,
                   public EmValueSource<float>
 {
-    public:
-      EmNexFloat(EmNextion& nex, 
-                 EmNexPage& page, 
-                 const char* name,
-                 uint8_t dec_places,
-                 bool logEnabled=false)
-        : EmNexPageElement(nex, page, name, logEnabled),
-          m_dec_places(dec_places)
-      {}
+public:
+    EmNexFloat(EmNextion& nex, 
+                EmNexPage& page, 
+                const char* name,
+                uint8_t dec_places,
+                bool logEnabled=false)
+    : EmNexPageElement(nex, page, name, logEnabled),
+        m_dec_places(dec_places)
+    {}
 
     virtual bool GetSourceValue(float& value);
     virtual bool SetSourceValue(const float value);
 
+protected:
     const uint8_t m_dec_places;
 };
 
 // A two labels number
 class EmNexDecimal: public EmValueSource<float>
 {
-    public:
-      EmNexDecimal(EmNextion& nex, 
-                   EmNexPage& page, 
-                   const char* int_name,
-                   const char* dec_name,
-                   uint8_t dec_places,
-                   bool logEnabled=false)
-        : m_int_element(nex, page, int_name, logEnabled),
-          m_dec_element(nex, page, dec_name, logEnabled),
-          m_dec_places(dec_places)
-      {}
+public:
+    EmNexDecimal(EmNextion& nex, 
+                EmNexPage& page, 
+                const char* int_name,
+                const char* dec_name,
+                uint8_t dec_places,
+                bool logEnabled=false)
+    : m_int_element(nex, page, int_name, logEnabled),
+        m_dec_element(nex, page, dec_name, logEnabled),
+        m_dec_places(dec_places)
+    {}
 
     virtual bool GetSourceValue(float& value) { return false; }
     virtual bool SetSourceValue(const float value);
 
+protected:
     EmNexInteger m_int_element;
     EmNexInteger m_dec_element;
     const uint8_t m_dec_places;

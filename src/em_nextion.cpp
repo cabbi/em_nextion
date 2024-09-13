@@ -3,7 +3,7 @@
 #include "em_timeout.h"
 
 
-// NOTE: HMI program MUST set "bauds" at first page initialization)
+// NOTE: program MUST set "bauds" at first page initialization)
 EmNextion::EmNextion(EmComSerial& serial, 
                      uint32_t timeoutMs, 
                      bool logEnabled)
@@ -122,7 +122,7 @@ bool EmNextion::SetCurPage(const EmNexPage& page)
 {
     const uint8_t max_size = 8;
     char cmd[max_size+1];
-    snprintf(cmd, max_size, "page %d", page.m_id);
+    snprintf(cmd, max_size, "page %d", page.Id());
     cmd[max_size]=0;
     if (!Send(cmd))
     {
@@ -147,9 +147,9 @@ bool EmNextion::GetNumElementValue(const char* page_name,
 }
 
 bool EmNextion::GetTextElementValue(const char* page_name, 
-                                  const char* element_name, 
-                                  char* txt, 
-                                  size_t len) 
+                                    const char* element_name, 
+                                    char* txt, 
+                                    size_t len) 
 {
     bool res = false;
     LogInfo("get: ", false);LogInfo(element_name, false);
@@ -232,7 +232,7 @@ bool EmNextion::GetNumber(int32_t& val)
               ((int32_t)buf[2]<<16) | 
               ((int32_t)buf[1]<<8) | 
               ((int32_t)buf[0]);        
-        return true; //Ack(ACK_CMD_SUCCEED);  TODO: how to set Nextion to send ACK?
+        return true;
     }
     return false;
 }
@@ -242,7 +242,7 @@ bool EmNextion::GetString(char* txt, size_t len)
     if (_Recv(ACK_STRING, txt, len, true))
     {
         txt[len-1]=0;
-        return true; //Ack(ACK_CMD_SUCCEED);  TODO: how to set Nextion to send ACK?
+        return true;
     }
     txt[0]=0;
     return false;
@@ -250,7 +250,7 @@ bool EmNextion::GetString(char* txt, size_t len)
 
 bool EmNexText::GetSourceValue(char* value)
 {
-    return m_nex.GetTextElementValue(m_page.Name(), m_name, value, m_Len);
+    return m_nex.GetTextElementValue(m_page.Name(), m_name, value, m_MaxLen);
 }
 
 bool EmNexText::SetSourceValue(const char* value)

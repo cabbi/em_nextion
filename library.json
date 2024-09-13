@@ -1,22 +1,19 @@
 {
   "name": "EmNextion",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Embedded Nextion display communication library",
-  "keywords": "",
-  "repository":
-  {
+  "keywords": ["display", "nextion"],
+  "repository": {
     "type": "git",
     "url": "https://github.com/cabbi/em_nextion.git"
   },
-  "authors":
-  [
-    {
-      "name": "Fabio Cabella"
-    }
-  ],
+  "authors": {
+      "name": "Fabio Cabella",
+      "maintainer": true    
+  },  
   "license": "BSD-3-Clause",
   "dependencies": {
-    "cabbi/EmCore": "~1.0.0"
+    "cabbi/EmCore": "~1.0.3"
   },  
   "frameworks": ["espidf", "freertos", "arduino"],
   "platforms": "*"
