@@ -40,7 +40,7 @@ class EmNextion: public EmLog
 public:
   EmNextion(EmComSerial& serial, 
             uint32_t timeoutMs=500, 
-            bool logEnabled=false);
+            EmLogLevel logLevel=EmLogLevel::none);
 
   bool Init();
 
@@ -107,8 +107,8 @@ class EmNexObject: public EmLog {
 public:
     EmNexObject(EmNextion& nex,
                 const char* name,
-                bool logEnabled=false)
-      : EmLog(logEnabled),
+                EmLogLevel logLevel=EmLogLevel::none)
+     : EmLog("NexObj", logLevel),
         m_name(name),
         m_nex(nex)
     {
@@ -127,8 +127,8 @@ public:
     EmNexPage(EmNextion& nex, 
               const uint8_t id, 
               const char* name,
-              bool logEnabled=false)
-      : EmNexObject(nex, name, logEnabled),
+              EmLogLevel logLevel=EmLogLevel::none)
+      : EmNexObject(nex, name, logLevel),
         m_id(id)
     {}
     
@@ -151,8 +151,8 @@ public:
     EmNexPageElement(EmNextion& nex,
                      EmNexPage& page, 
                      const char* name,
-                     bool logEnabled=false)
-     : EmNexObject(nex, name, logEnabled),
+                     EmLogLevel logLevel=EmLogLevel::none)
+     : EmNexObject(nex, name, logLevel),
         m_page(page)
     {}
 
@@ -161,74 +161,76 @@ public:
 };
 
 class EmNexText: public EmNexPageElement,
-                 public EmValueSource<char*>
+                 public EmValue<char*>
 {
 public:
     EmNexText(EmNextion& nex, 
-                EmNexPage& page, 
-                const char* name,
-                const uint8_t len,
-                bool logEnabled=false)
-     : EmNexPageElement(nex, page, name, logEnabled),
-       EmValueSource<char*>(len)
+              EmNexPage& page, 
+              const char* name,
+              const uint8_t len,
+              EmLogLevel logLevel=EmLogLevel::none)
+     : EmNexPageElement(nex, page, name, logLevel),
+       EmValue<char*>(len)
     {}
 
-    virtual bool GetSourceValue(char* value);
-    virtual bool SetSourceValue(const char* value);
+    virtual bool GetValue(char* value) const;
+    virtual bool SetValue(char* const value);
 };
 
 class EmNexInteger: public EmNexPageElement,
-                    public EmValueSource<int32_t>
+                    public EmValue<int32_t>
 {
 public:
     EmNexInteger(EmNextion& nex, 
-                EmNexPage& page, 
-                const char* name,
-                bool logEnabled=false)
-     : EmNexPageElement(nex, page, name, logEnabled)
+                 EmNexPage& page, 
+                 const char* name,
+                 EmLogLevel logLevel=EmLogLevel::none)
+     : EmNexPageElement(nex, page, name, logLevel)
     {}
 
-    virtual bool GetSourceValue(int32_t& value);
-    virtual bool SetSourceValue(const int32_t value);
+    virtual bool GetValue(int32_t& value) const;
+    virtual bool SetValue(int32_t const value);
 };
 
 class EmNexFloat: public EmNexPageElement,
-                  public EmValueSource<float>
+                  public EmValue<float>
 {
 public:
     EmNexFloat(EmNextion& nex, 
-                EmNexPage& page, 
-                const char* name,
-                uint8_t dec_places,
-                bool logEnabled=false)
-    : EmNexPageElement(nex, page, name, logEnabled),
-        m_dec_places(dec_places)
+               EmNexPage& page, 
+               const char* name,
+               uint8_t dec_places,
+               EmLogLevel logLevel=EmLogLevel::none)
+     : EmNexPageElement(nex, page, name, logLevel),
+       m_dec_places(dec_places)
     {}
 
-    virtual bool GetSourceValue(float& value);
-    virtual bool SetSourceValue(const float value);
+    virtual bool GetValue(float& value) const;
+    virtual bool SetValue(float const value);
 
 protected:
     const uint8_t m_dec_places;
 };
 
 // A two labels number
-class EmNexDecimal: public EmValueSource<float>
+class EmNexDecimal: public EmValue<float>
 {
 public:
     EmNexDecimal(EmNextion& nex, 
-                EmNexPage& page, 
-                const char* int_name,
-                const char* dec_name,
-                uint8_t dec_places,
-                bool logEnabled=false)
-    : m_int_element(nex, page, int_name, logEnabled),
-        m_dec_element(nex, page, dec_name, logEnabled),
-        m_dec_places(dec_places)
+                 EmNexPage& page, 
+                 const char* int_name,
+                 const char* dec_name,
+                 uint8_t dec_places,
+                 EmLogLevel logLevel=EmLogLevel::none)
+     : m_int_element(nex, page, int_name, logLevel),
+       m_dec_element(nex, page, dec_name, logLevel),
+       m_dec_places(dec_places)
     {}
 
-    virtual bool GetSourceValue(float& value) { return false; }
-    virtual bool SetSourceValue(const float value);
+    virtual bool GetValue(float& value) const { 
+        return false; 
+    }
+    virtual bool SetValue(float const value);
 
 protected:
     EmNexInteger m_int_element;

@@ -6,8 +6,8 @@
 // NOTE: program MUST set "bauds" at first page initialization)
 EmNextion::EmNextion(EmComSerial& serial, 
                      uint32_t timeoutMs, 
-                     bool logEnabled)
- : EmLog(logEnabled),
+                     EmLogLevel logLevel)
+ : EmLog("Nex", logLevel),
    m_Serial(serial),
    m_TimeoutMs(timeoutMs),
    m_IsInit(false)
@@ -39,8 +39,7 @@ bool EmNextion::_Send(const char* cmd)
 {
     m_Serial.flush();
     m_Serial.write(cmd);
-    LogInfo("TX: ", false);
-    LogInfo(cmd, true);
+    LogDebug<50>("TX: %s", cmd);
     m_Serial.write(0xFF);
     m_Serial.write(0xFF);
     return m_Serial.write(0xFF) == 1;
@@ -53,14 +52,11 @@ bool EmNextion::_Recv(uint8_t ack_code, char* buf, uint8_t len, bool isText)
     uint8_t term_count=0;
     uint8_t buf_pos=0;
     EmTimeout rxTimeout(m_TimeoutMs);
-    LogInfo("RX: ", false);
     while (!rxTimeout.IsElapsed(false))
     {
         while (m_Serial.available())
         {
             int c = m_Serial.read();
-            LogInfo((uint8_t)c, false);
-            LogInfo("-", false);
             // Still waiting for ack code?
             if (!got_ack_code)
             {
@@ -96,12 +92,13 @@ bool EmNextion::_Recv(uint8_t ack_code, char* buf, uint8_t len, bool isText)
             }
         }
     }
+    LogDebug<50>("RX: %s [SUCCESS]", buf);
     return _Result(false);
 }
 
 bool EmNextion::Ack(uint8_t ack_code) 
 {
-    LogInfo("Waiting ACK", false);
+    LogDebug(F("Waiting ACK"));
     return _Recv(ack_code, NULL, 0);
 }
 
@@ -113,7 +110,7 @@ bool EmNextion::GetCurPage(uint8_t& page_id)
     }
     if (_Recv(ACK_CURRENT_PAGE_ID, (char*)&page_id, 1))
     {
-        return true; //Ack(ACK_CMD_SUCCEED);
+        return true;
     }
     return false;
 }
@@ -136,13 +133,13 @@ bool EmNextion::GetNumElementValue(const char* page_name,
                                  int32_t& val) 
 {
     bool res = false;
-    LogInfo("get: ", false);LogInfo(element_name, false);
-    if (SendGetCmd(page_name, element_name, "val"))
-    {
+    if (SendGetCmd(page_name, element_name, "val")) {
         res = GetNumber(val);
-        LogInfo(" -> ", false);LogInfo(val, false);
     }
-    LogInfo(res ? " [SUCCESS]" : " [FAIL]", true);
+    LogDebug<50>("get: %s -> %d [%s]", 
+                 element_name,
+                 val,
+                 (res ? " [SUCCESS]" : " [FAIL]"));
     return res;
 }
 
@@ -152,13 +149,14 @@ bool EmNextion::GetTextElementValue(const char* page_name,
                                     size_t len) 
 {
     bool res = false;
-    LogInfo("get: ", false);LogInfo(element_name, false);
     if (SendGetCmd(page_name, element_name, "txt"))
     {
         res = GetString(txt, len);    
-        LogInfo(" -> ", false);LogInfo(txt, false);
     }
-    LogInfo(res ? " [SUCCESS]" : " [FAIL]", true);
+    LogDebug<50>("get: %s -> %s [%s]", 
+                 element_name,
+                 txt,
+                 (res ? " [SUCCESS]" : " [FAIL]"));
     return res;
 }
 
@@ -166,12 +164,14 @@ bool EmNextion::SetNumElementValue(const char* page_name,
                                  const char* element_name, 
                                  int32_t val) {
     bool res = false;
-    LogInfo("set: ", false);LogInfo(element_name, false);LogInfo(" -> ", false);LogInfo(val, false);
     if (SendSetCmd(page_name, element_name, "val", val))
     {
         res = Ack(ACK_CMD_SUCCEED);
     }
-    LogInfo(res ? " [SUCCESS]" : " [FAIL]", true);
+    LogDebug<50>("set: %s -> %d [%s]", 
+                 element_name,
+                 val,
+                 (res ? " [SUCCESS]" : " [FAIL]"));
     return res;
 }
 
@@ -179,12 +179,14 @@ bool EmNextion::SetTextElementValue(const char* page_name,
                                   const char* element_name, 
                                   const char* txt) {
     bool res = false;
-    LogInfo("set: ", false);LogInfo(element_name, false);LogInfo(" -> ", false);LogInfo(txt, false);
     if (SendSetCmd(page_name, element_name, "txt", element_name))
     {
         res = Ack(ACK_CMD_SUCCEED);
     }
-    LogInfo(res ? " [SUCCESS]" : " [FAIL]", true);
+    LogDebug<50>("set: %s -> %s [%s]", 
+                 element_name,
+                 txt,
+                 (res ? " [SUCCESS]" : " [FAIL]"));
     return res;
 }
 
@@ -248,53 +250,49 @@ bool EmNextion::GetString(char* txt, size_t len)
     return false;
 }
 
-bool EmNexText::GetSourceValue(char* value)
+bool EmNexText::GetValue(char* value) const
 {
     return m_nex.GetTextElementValue(m_page.Name(), m_name, value, m_MaxLen);
 }
 
-bool EmNexText::SetSourceValue(const char* value)
+bool EmNexText::SetValue(char* const value)
 {
     return m_nex.SetTextElementValue(m_page.Name(), m_name, value);
 }
 
-bool EmNexInteger::GetSourceValue(int32_t& value)
+bool EmNexInteger::GetValue(int32_t& value) const
 {
     return m_nex.GetNumElementValue(m_page.Name(), m_name, value);
 }
 
-bool EmNexInteger::SetSourceValue(const int32_t value)
+bool EmNexInteger::SetValue(int32_t const value)
 {
     return m_nex.SetNumElementValue(m_page.Name(), m_name, value);
 }
 
-bool EmNexFloat::GetSourceValue(float& value)
+bool EmNexFloat::GetValue(float& value) const
 {
     bool res = false;
     int32_t val;
     if (m_nex.GetNumElementValue(m_page.Name(), m_name, val))
     {
         value = (float)val/pow(10, m_dec_places);
-        LogInfo(" -> ", false);LogInfo(value, false);
         res = true;
     }
     return res;
 }
 
-bool EmNexFloat::SetSourceValue(const float value)
+bool EmNexFloat::SetValue(float const value)
 {
     return m_nex.SetNumElementValue(m_page.Name(), 
                                     m_name, 
                                     (int32_t)round(value*pow(10, m_dec_places)));
 }
 
-bool EmNexDecimal::SetSourceValue(const float value)
+bool EmNexDecimal::SetValue(float const value)
 {
-    bool res = false;
     int32_t exp = pow(10, m_dec_places);
     int32_t dispValue = (int32_t)round(value*exp);
-    res = m_int_element.SetSourceValue(dispValue/exp);
-    res = m_dec_element.SetSourceValue(dispValue%exp);
-
-    return res;
+    return m_int_element.SetValue(dispValue/exp) &&
+           m_dec_element.SetValue(dispValue%exp);
 }
