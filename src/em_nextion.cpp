@@ -1,300 +1,320 @@
-#include <math.h> 
+#include <stdarg.h>
+
 #include "em_nextion.h"
 #include "em_timeout.h"
+#include "em_defs.h"
 
 
 // NOTE: program MUST set "bauds" at first page initialization)
 EmNextion::EmNextion(EmComSerial& serial, 
                      uint32_t timeoutMs, 
-                     bool logEnabled)
- : EmLog(logEnabled),
+                     EmLogLevel logLevel)
+ : EmLog("Nex", logLevel),
    m_Serial(serial),
    m_TimeoutMs(timeoutMs),
    m_IsInit(false)
 {
 }
 
-bool EmNextion::Init()
+bool EmNextion::Init() const
 {
     // Have command feedback on both success/fail  
-    _Send("bkcmd=3");
-    m_IsInit = Ack(ACK_CMD_SUCCEED);
+    _sendCmdParam("bkcmd=3");
+    _sendCmdEnd();
+    m_IsInit = _ack(ACK_CMD_SUCCEED);
     return m_IsInit;
 }
 
-bool EmNextion::Send(const char* cmd)
+bool EmNextion::_sendCmd(const char* firstCmd, ...) const
 {
     // Before sending let's see if display is active/connected
-    if (!m_IsInit)
-    {
-        if (!Init())
-        {
+    if (!m_IsInit) {
+        if (!Init()) {
             return false;
         } 
     }
-    return _Send(cmd);
+    m_Serial.flush();
+    _sendCmdParam(firstCmd);
+    va_list args;
+    va_start(args, firstCmd);     
+    const char* cmdParam = va_arg(args, const char*);
+    while (cmdParam) {
+        _sendCmdParam(cmdParam);
+        cmdParam = va_arg(args, const char*);
+    }
+    va_end(args);
+
+    return _sendCmdEnd();
 }
 
-bool EmNextion::_Send(const char* cmd)
+bool EmNextion::_sendCmdParam(const char* cmdParam) const
 {
-    m_Serial.flush();
-    m_Serial.write(cmd);
-    LogInfo("TX: ", false);
-    LogInfo(cmd, true);
+    return m_Serial.write(cmdParam) > 0;
+}
+
+bool EmNextion::_sendCmdEnd() const
+{
     m_Serial.write(0xFF);
     m_Serial.write(0xFF);
     return m_Serial.write(0xFF) == 1;
 }
 
-bool EmNextion::_Recv(uint8_t ack_code, char* buf, uint8_t len, bool isText)
+EmGetValueResult EmNextion::_recv(uint8_t ackCode, 
+                                  char* buf, 
+                                  uint8_t len, 
+                                  bool isText) const
 {
-    bool got_ack_code=false;
+    bool value_changed = false;
+    bool got_ackCode=false;
     bool got_buffer=(len==0);
     uint8_t term_count=0;
     uint8_t buf_pos=0;
     EmTimeout rxTimeout(m_TimeoutMs);
-    LogInfo("RX: ", false);
-    while (!rxTimeout.IsElapsed(false))
-    {
-        while (m_Serial.available())
-        {
-            int c = m_Serial.read();
-            LogInfo((uint8_t)c, false);
-            LogInfo("-", false);
+    while (!rxTimeout.IsElapsed(false)) {
+        while (m_Serial.available()) {
+            uint8_t c = static_cast<uint8_t>(m_Serial.read());
             // Still waiting for ack code?
-            if (!got_ack_code)
-            {
-                got_ack_code = (c==ack_code);
+            if (!got_ackCode) {
+                got_ackCode = (c==ackCode);
             }
             // Still waiting for data?
-            else if (!got_buffer)
-            {
-                if (isText && c == 0xFF)
-                {
-                    buf[buf_pos++] = 0;
+            else if (!got_buffer) {
+                if (isText && c == 0xFF) {
+                    buf[buf_pos] = 0;
                     got_buffer = true;    
-                }
-                else
-                {
-                    buf[buf_pos++] = c;
+                    term_count = 1;
+                } else {
+                    if (buf[buf_pos] != c) {
+                        // We might have reached text buffer size 
+                        if (!(isText && buf_pos==len-1)) {
+                            value_changed = true;
+                        }
+                    }
+                    buf[buf_pos++] = static_cast<char>(c);
                     got_buffer = (buf_pos==len);
                 }
             }
             // Still waiting for terminators!
-            else
-            {
-                if (c != 0xFF)
-                {
-                    return _Result(false);
+            else {
+                if (c != 0xFF) {
+                    if (isText) {
+                        // We might have reached text buffer 
+                        // size but not all display text!
+                        buf[buf_pos] = 0;
+                        continue;
+                    }
+                    return _result(false, value_changed);
                 }
                 term_count++;
-                if (term_count>=3)
-                {
-                    // We got evertying
-                    return _Result(true);
+                if (term_count>=3) {
+                    // Got everything
+                    return _result(true, value_changed);
                 }
             }
         }
     }
-    return _Result(false);
+    LogDebug<50>("RX: %s [SUCCESS]", buf);
+    return _result(false, value_changed);
 }
 
-bool EmNextion::Ack(uint8_t ack_code) 
-{
-    LogInfo("Waiting ACK", false);
-    return _Recv(ack_code, NULL, 0);
+EmGetValueResult EmNextion::_result(bool result, bool valueChanged) const
+{ 
+    if (!result) { 
+        m_IsInit = false;
+        return EmGetValueResult::failed;
+    }
+    return valueChanged ? 
+           EmGetValueResult::succeedNotEqualValue : 
+           EmGetValueResult::succeedEqualValue;
 }
 
-bool EmNextion::GetCurPage(uint8_t& page_id) 
+bool EmNextion::_ack(uint8_t ackCode) const 
 {
-    if (!Send("sendme"))
-    {
+    LogDebug(F("Waiting ACK"));
+    return EmGetValueResult::failed != _recv(ackCode, NULL, 0);
+}
+
+bool EmNextion::GetCurPage(uint8_t& pageId) const 
+{
+    if (!_sendCmd("sendme", NULL)) {
         return false;
     }
-    if (_Recv(ACK_CURRENT_PAGE_ID, (char*)&page_id, 1))
-    {
-        return true; //Ack(ACK_CMD_SUCCEED);
+    if (EmGetValueResult::failed != _recv(ACK_CURRENT_PAGE_ID, 
+                                         (char*)&pageId, 1)) {
+        return true;
     }
     return false;
 }
 
-bool EmNextion::SetCurPage(const EmNexPage& page) 
+bool EmNextion::SetCurPage(uint8_t pageId) const 
 {
-    const uint8_t max_size = 8;
-    char cmd[max_size+1];
-    snprintf(cmd, max_size, "page %d", page.Id());
-    cmd[max_size]=0;
-    if (!Send(cmd))
-    {
+    char buf[3];
+    if (!_sendCmd("page ", to_str(buf, 3, pageId), NULL)) {
         return false;
     }
-    return Ack(ACK_CMD_SUCCEED);
+    return _ack(ACK_CMD_SUCCEED);
 }
 
-bool EmNextion::GetNumElementValue(const char* page_name, 
-                                 const char* element_name, 
-                                 int32_t& val) 
+bool EmNextion::SetCurPage(const char* pageName) const 
 {
-    bool res = false;
-    LogInfo("get: ", false);LogInfo(element_name, false);
-    if (SendGetCmd(page_name, element_name, "val"))
-    {
-        res = GetNumber(val);
-        LogInfo(" -> ", false);LogInfo(val, false);
+    if (!_sendCmd("page ", pageName, NULL)) {
+        return false;
     }
-    LogInfo(res ? " [SUCCESS]" : " [FAIL]", true);
+    return _ack(ACK_CMD_SUCCEED);
+}
+
+EmGetValueResult EmNextion::GetNumElementValue(const char* pageName, 
+                                               const char* elementName, 
+                                               int32_t& val) const 
+{
+    EmGetValueResult res = EmGetValueResult::failed;
+    if (_sendGetCmd(pageName, elementName, "val")) {
+        res = _getNumber(val);
+    }
+    LogDebug<50>("get: %s -> %d [%s]", 
+                 elementName,
+                 val,
+                 (EmGetValueResult::failed != res ? 
+                  " [SUCCESS]" : 
+                  " [FAIL]"));
     return res;
 }
 
-bool EmNextion::GetTextElementValue(const char* page_name, 
-                                    const char* element_name, 
-                                    char* txt, 
-                                    size_t len) 
-{
+bool EmNextion::SetNumElementValue(const char* pageName, 
+                                   const char* elementName, 
+                                   int32_t val) const {
     bool res = false;
-    LogInfo("get: ", false);LogInfo(element_name, false);
-    if (SendGetCmd(page_name, element_name, "txt"))
-    {
-        res = GetString(txt, len);    
-        LogInfo(" -> ", false);LogInfo(txt, false);
+    if (_sendSetCmd(pageName, elementName, "val", val)) {
+        res = _ack(ACK_CMD_SUCCEED);
     }
-    LogInfo(res ? " [SUCCESS]" : " [FAIL]", true);
+    LogDebug<50>("set: %s -> %d [%s]", 
+                 elementName,
+                 val,
+                 (res ? " [SUCCESS]" : " [FAIL]"));
     return res;
 }
 
-bool EmNextion::SetNumElementValue(const char* page_name, 
-                                 const char* element_name, 
-                                 int32_t val) {
+bool EmNextion::SetTextElementValue(const char* pageName, 
+                                    const char* elementName, 
+                                    const char* txt) const {
     bool res = false;
-    LogInfo("set: ", false);LogInfo(element_name, false);LogInfo(" -> ", false);LogInfo(val, false);
-    if (SendSetCmd(page_name, element_name, "val", val))
-    {
-        res = Ack(ACK_CMD_SUCCEED);
+    if (_sendSetCmd(pageName, elementName, "txt", txt)) {
+        res = _ack(ACK_CMD_SUCCEED);
     }
-    LogInfo(res ? " [SUCCESS]" : " [FAIL]", true);
+    LogDebug<50>("set: %s -> %s [%s]", 
+                 elementName,
+                 txt,
+                 (res ? " [SUCCESS]" : " [FAIL]"));
     return res;
 }
 
-bool EmNextion::SetTextElementValue(const char* page_name, 
-                                  const char* element_name, 
-                                  const char* txt) {
-    bool res = false;
-    LogInfo("set: ", false);LogInfo(element_name, false);LogInfo(" -> ", false);LogInfo(txt, false);
-    if (SendSetCmd(page_name, element_name, "txt", element_name))
-    {
-        res = Ack(ACK_CMD_SUCCEED);
-    }
-    LogInfo(res ? " [SUCCESS]" : " [FAIL]", true);
-    return res;
+bool EmNextion::_sendGetCmd(const char* pageName, 
+                  const char* elementName, 
+                  const char* property) const
+{
+    return _sendCmd("get ", 
+                    pageName, ".", 
+                    elementName, ".",
+                    property, NULL);
 }
 
-bool EmNextion::SendGetCmd(const char* page_name, 
-                  const char* element_name, 
-                  const char* property)
+bool EmNextion::_sendSetCmd(const char* pageName, 
+                            const char* elementName, 
+                            const char* property, 
+                            int32_t value) const
 {
-    const uint8_t max_size = 80;
-    char cmd[max_size+1];
-    snprintf(cmd, max_size, "get %s.%s.%s", page_name, element_name, property);
-    cmd[max_size]=0;
-    return Send(cmd);
+    char buf[11];
+    return _sendCmd(pageName, ".", 
+                    elementName, ".",
+                    property, "=",
+                    to_str(buf, 11, value), NULL);
 }
 
-bool EmNextion::SendSetCmd(const char* page_name, 
-                  const char* element_name, 
-                  const char* property, int32_t value)
+bool EmNextion::_sendSetCmd(const char* pageName, 
+                            const char* elementName, 
+                            const char* property, 
+                            const char* value) const
 {
-    const uint8_t max_size = 100;
-    char cmd[max_size+1];
-    snprintf(cmd, max_size, "%s.%s.%s=%ld", page_name, element_name, property, value);
-    cmd[max_size]=0;
-    return Send(cmd);
-}
-
-bool EmNextion::SendSetCmd(const char* page_name, 
-                  const char* element_name, 
-                  const char* property, const char* value)
-{
-    const uint8_t max_size = 200;
-    char cmd[max_size+1];
-    snprintf(cmd, max_size, "%s.%s.%s=\"%s\"", page_name, element_name, property, value);
-    cmd[max_size]=0;
-    return Send(cmd);
+    return _sendCmd(pageName, ".", 
+                    elementName, ".",
+                    property, "=",
+                    "\"", value, "\"", NULL);
 }
 
 
-bool EmNextion::GetNumber(int32_t& val) 
+EmGetValueResult EmNextion::_getNumber(int32_t& val) const 
 {
-    uint8_t buf[4] = {0};
+    // Create a copy in case communication fails 
+    //(i.e. some bytes might be modified by _recv method!)
+    char buf[4];
+    // TODO: Nextion is little endian, should we check about big endian CPU?
+    memcpy(buf, &val, sizeof(buf));
 
-    if (_Recv(ACK_NUMBER, (char*)buf, sizeof(buf)))
-    {
+    EmGetValueResult res = _recv(ACK_NUMBER, buf, sizeof(buf));
+
+    if (EmGetValueResult::failed != res) {
         val = ((int32_t)buf[3]<<24) | 
               ((int32_t)buf[2]<<16) | 
               ((int32_t)buf[1]<<8) | 
               ((int32_t)buf[0]);        
-        return true;
-    }
-    return false;
-}
-
-bool EmNextion::GetString(char* txt, size_t len)  
-{
-    if (_Recv(ACK_STRING, txt, len, true))
-    {
-        txt[len-1]=0;
-        return true;
-    }
-    txt[0]=0;
-    return false;
-}
-
-bool EmNexText::GetSourceValue(char* value)
-{
-    return m_nex.GetTextElementValue(m_page.Name(), m_name, value, m_MaxLen);
-}
-
-bool EmNexText::SetSourceValue(const char* value)
-{
-    return m_nex.SetTextElementValue(m_page.Name(), m_name, value);
-}
-
-bool EmNexInteger::GetSourceValue(int32_t& value)
-{
-    return m_nex.GetNumElementValue(m_page.Name(), m_name, value);
-}
-
-bool EmNexInteger::SetSourceValue(const int32_t value)
-{
-    return m_nex.SetNumElementValue(m_page.Name(), m_name, value);
-}
-
-bool EmNexFloat::GetSourceValue(float& value)
-{
-    bool res = false;
-    int32_t val;
-    if (m_nex.GetNumElementValue(m_page.Name(), m_name, val))
-    {
-        value = (float)val/pow(10, m_dec_places);
-        LogInfo(" -> ", false);LogInfo(value, false);
-        res = true;
     }
     return res;
 }
 
-bool EmNexFloat::SetSourceValue(const float value)
+EmGetValueResult EmNextion::_getString(char* txt, 
+                                       uint8_t bufLen, 
+                                       const char* elementName) const  
 {
-    return m_nex.SetNumElementValue(m_page.Name(), 
-                                    m_name, 
-                                    (int32_t)round(value*pow(10, m_dec_places)));
+    EmGetValueResult res = _recv(ACK_STRING, txt, bufLen, true);
+    if (EmGetValueResult::failed == res) {
+        txt[0]=0;
+    } else { 
+        txt[bufLen-1]=0;
+    } 
+    LogDebug<50>("get: %s -> %s [%s]", 
+                 elementName,
+                 txt,
+                 (EmGetValueResult::failed != res ? 
+                  " [SUCCESS]" : 
+                  " [FAIL]"));
+    return res;
 }
 
-bool EmNexDecimal::SetSourceValue(const float value)
+EmGetValueResult EmNexReal::GetValue(nex_real_t& value) const 
 {
-    bool res = false;
-    int32_t exp = pow(10, m_dec_places);
-    int32_t dispValue = (int32_t)round(value*exp);
-    res = m_int_element.SetSourceValue(dispValue/exp);
-    res = m_dec_element.SetSourceValue(dispValue%exp);
-
+    int32_t val = iMolt(value, iPow10(m_decPlaces));
+    EmGetValueResult res = Nex().GetNumElementValue(Page().Name(), m_name, val);
+    if (EmGetValueResult::failed != res) {
+        value = static_cast<nex_real_t>(val)/pow(10, m_decPlaces);
+    }
     return res;
+}
+
+bool EmNexDecimal::SetValue(nex_real_t const value) 
+{
+    int32_t exp = iPow10(m_decPlaces);
+    int32_t dispValue = iRound(value*static_cast<nex_real_t>(exp));
+    return Nex().SetNumElementValue(Page().Name(), m_name, iDiv(dispValue, exp)) &&
+           Nex().SetNumElementValue(Page().Name(), m_decElementName, dispValue % exp);        
+}
+
+EmGetValueResult EmNexDecimal::GetValue(nex_real_t& value) const 
+{ 
+    nex_real_t prevValue = value;
+    EmGetValueResult res;
+    int32_t intVal;
+    res = Nex().GetNumElementValue(Page().Name(), m_name, intVal);
+    if (res == EmGetValueResult::failed) {
+        return EmGetValueResult::failed;
+    }
+    int32_t decVal;
+    res = Nex().GetNumElementValue(Page().Name(), m_decElementName, decVal);
+    if (res == EmGetValueResult::failed) {
+        return EmGetValueResult::failed;
+    }
+    value = intVal+(static_cast<nex_real_t>(decVal)/pow(10, m_decPlaces));
+
+    return prevValue == value ? 
+           EmGetValueResult::succeedEqualValue :
+           EmGetValueResult::succeedNotEqualValue;
 }

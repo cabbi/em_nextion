@@ -7,233 +7,269 @@
 #include "em_com_device.h"
 #include "em_sync_value.h"
 
-enum EmNextionRet
-{
-  ACK_CMD_SUCCEED = 0x01,
-  ACK_CURRENT_PAGE_ID = 0x66,
-  ACK_STRING = 0x70,
-  ACK_NUMBER = 0x71,
-  INVALID_CMD = 0x00,
-  INVALID_COMPONENT_ID = 0x02,
-  INVALID_PAGE_ID = 0x03,
-  INVALID_PICTURE_ID = 0x04,
-  INVALID_FONT_ID = 0x05,
-  INVALID_BAUD = 0x11,
-  INVALID_VARIABLE = 0x1A,
-  INVALID_OPERATION = 0x1B
+enum EmNextionRet: uint8_t {
+    ACK_CMD_SUCCEED = 0x01,
+    ACK_CURRENT_PAGE_ID = 0x66,
+    ACK_STRING = 0x70,
+    ACK_NUMBER = 0x71,
+    INVALID_CMD = 0x00,
+    INVALID_COMPONENT_ID = 0x02,
+    INVALID_PAGE_ID = 0x03,
+    INVALID_PICTURE_ID = 0x04,
+    INVALID_FONT_ID = 0x05,
+    INVALID_BAUD = 0x11,
+    INVALID_VARIABLE = 0x1A,
+    INVALID_OPERATION = 0x1B
 };
 
-class EmNexPage;
-class EmNexPageElement;
-class EmNexText;
-class EmNexInteger;
-class EmNexFloat;
+#ifdef NEX_REAL_AS_DOUBLE
+typedef double nex_real_t;
+#else
+typedef float nex_real_t;
+#endif
 
-class EmNextion: public EmLog
-{
-    friend class EmNexPage;
-    friend class EmNexPageElement;
-    friend class EmNexText;
-    friend class EmNexInteger;
-    friend class EmNexFloat;
-
+class EmNextion: public EmLog {
 public:
-  EmNextion(EmComSerial& serial, 
-            uint32_t timeoutMs=500, 
-            bool logEnabled=false);
+    EmNextion(EmComSerial& serial, 
+              uint32_t timeoutMs=10, 
+              EmLogLevel logLevel=EmLogLevel::none);
 
-  bool Init();
+    bool Init() const;
 
-  bool IsInit()
-    { return m_IsInit;}
+    bool IsInit() const { 
+        return m_IsInit;
+    }
 
-  bool GetCurPage(uint8_t& page_id);
-  bool SetCurPage(const EmNexPage& page);
+    bool GetCurPage(uint8_t& pageId) const;
+    bool SetCurPage(uint8_t pageId) const;
+    bool SetCurPage(const char* pageName) const;
 
-  bool GetNumElementValue(const char* page_name, 
-                          const char* element_name, 
-                          int32_t& val);
-  bool GetTextElementValue(const char* page_name, 
-                          const char* element_name, 
-                          char* txt, 
-                          size_t len);
+    EmGetValueResult GetNumElementValue(const char* pageName, 
+                                        const char* elementName, 
+                                        int32_t& val) const;
+    template<size_t len>
+    EmGetValueResult GetTextElementValue(const char* pageName, 
+                                         const char* elementName, 
+                                         char* txt) const;
 
-  bool SetNumElementValue(const char* page_name, 
-                          const char* element_name, 
-                          int32_t val);
-  bool SetTextElementValue(const char* page_name, 
-                           const char* element_name, 
-                           const char* txt);
-
-protected:
-  bool SendGetCmd(const char* page_name, 
-                  const char* element_name, 
-                  const char* property);
-  bool SendSetCmd(const char* page_name, 
-                  const char* element_name, 
-                  const char* property, 
-                  int32_t value);
-  bool SendSetCmd(const char* page_name, 
-                  const char* element_name, 
-                  const char* property, 
-                  const char* value);
-  bool GetNumber(int32_t& val);
-  bool GetString(char* txt, size_t len);
-
-  bool Send(const char* cmd);
-  bool Ack(uint8_t ack_code);
-  
-  void ReleaseSerial() 
-  { 
-      m_Serial.ReleaseDevice(); 
-  };
+    bool SetNumElementValue(const char* pageName, 
+                            const char* elementName, 
+                            int32_t val) const;
+    bool SetTextElementValue(const char* pageName, 
+                             const char* elementName, 
+                             const char* txt) const;
 
 protected:
-  bool _Send(const char* cmd);
-  bool _Recv(uint8_t ack_code, char* buf, uint8_t len, bool isText=false);
-  bool _Result(bool result)
-  { 
-      if (!result) m_IsInit = false;
-      return result;
-  }
+    bool _sendGetCmd(const char* pageName, 
+                     const char* elementName, 
+                     const char* property) const;
+    bool _sendSetCmd(const char* pageName, 
+                     const char* elementName, 
+                     const char* property, 
+                     int32_t value) const;
+    bool _sendSetCmd(const char* pageName, 
+                     const char* elementName, 
+                     const char* property, 
+                     const char* value) const;
+    EmGetValueResult _getNumber(int32_t& val) const;
+    EmGetValueResult _getString(char* txt, 
+                                uint8_t bufLen, 
+                                const char* elementName) const;
+
+    bool _sendCmd(const char* firstCmd, ...) const;
+    bool _sendCmdParam(const char* cmdParam) const;
+    bool _sendCmdEnd() const;
+    bool _ack(uint8_t ackCode) const;
+    EmGetValueResult _recv(uint8_t ackCode, 
+                           char* buf, 
+                           uint8_t len, 
+                           bool isText=false) const;
+    EmGetValueResult _result(bool result, bool valueChanged) const;
 
 private:
-  EmComSerial& m_Serial;       
-  uint32_t m_TimeoutMs;
-  bool m_IsInit;
+    EmComSerial& m_Serial;       
+    const uint32_t m_TimeoutMs;
+    mutable bool m_IsInit;
 };
 
 class EmNexObject: public EmLog {
 public:
-    EmNexObject(EmNextion& nex,
-                const char* name,
-                bool logEnabled=false)
-      : EmLog(logEnabled),
-        m_name(name),
-        m_nex(nex)
-    {
-    }
+    EmNexObject(const char* name,
+                EmLogLevel logLevel=EmLogLevel::none)
+     : EmLog("NexObj", logLevel),
+       m_name(name) {}
 
-    virtual const char* Name() const { return m_name; }
+    const char* Name() const { return m_name; }
 
 protected:
     const char* m_name;
-    EmNextion& m_nex;
 };
 
 class EmNexPage: public EmNexObject
 {
 public:
-    EmNexPage(EmNextion& nex, 
+    EmNexPage(EmNextion& nex,
               const uint8_t id, 
               const char* name,
-              bool logEnabled=false)
-      : EmNexObject(nex, name, logEnabled),
+              EmLogLevel logLevel=EmLogLevel::none)
+      : EmNexObject(name, logLevel),
+        m_nex(nex),
         m_id(id)
     {}
     
+    EmNextion& Nex() const {
+        return m_nex;
+    }
+
     uint8_t Id() const {
         return m_id;
     }
 
-    bool IsCurrent() {
+    bool IsCurrent() const {
         uint8_t id;
-        return m_nex.GetCurPage(id) && id == m_id;
+        return Nex().GetCurPage(id) && id == m_id;
     }
 
 protected:
+    EmNextion& m_nex;
     const uint8_t m_id;
 };
 
 class EmNexPageElement: public EmNexObject
 {
 public:
-    EmNexPageElement(EmNextion& nex,
-                     EmNexPage& page, 
+    EmNexPageElement(EmNexPage& page,
                      const char* name,
-                     bool logEnabled=false)
-     : EmNexObject(nex, name, logEnabled),
-        m_page(page)
-    {}
+                     EmLogLevel logLevel=EmLogLevel::none)
+     : EmNexObject(name, logLevel),
+       m_page(page) {}
 
-  protected:
-    const EmNexPage& m_page;
+    EmNextion& Nex() const {
+        return m_page.Nex();
+    }
+
+    EmNexPage& Page() const {
+        return m_page;
+    }
+
+    const char* PageName() const {
+        return m_page.Name();
+    }
+
+protected:
+    EmNexPage& m_page;
 };
 
 class EmNexText: public EmNexPageElement,
-                 public EmValueSource<char*>
+                 public EmValue<char*>
 {
 public:
-    EmNexText(EmNextion& nex, 
-                EmNexPage& page, 
-                const char* name,
-                const uint8_t len,
-                bool logEnabled=false)
-     : EmNexPageElement(nex, page, name, logEnabled),
-       EmValueSource<char*>(len)
-    {}
+    EmNexText(EmNexPage& page,
+              const char* name,
+              EmLogLevel logLevel=EmLogLevel::none)
+     : EmNexPageElement(page, name, logLevel),
+       EmValue<char*>() {}
 
-    virtual bool GetSourceValue(char* value);
-    virtual bool SetSourceValue(const char* value);
+    template<size_t len>
+    EmGetValueResult GetValue(char* value) const {
+        return Nex().GetTextElementValue<len>(PageName(), m_name, value);
+    }
+
+    virtual EmGetValueResult GetValue(char* value) const override {
+        // NOTE:
+        //  Since 'GetValue' overrides a virtual method it can not 
+        //  be template based. 100 should be a good compromise.
+        //  To use exact len please use the templated 'getValue' method. 
+        return GetValue<100>(value);
+    }
+
+    virtual bool SetValue(const char* value) override {
+        return Nex().SetTextElementValue(PageName(), m_name, value);
+    }
 };
 
 class EmNexInteger: public EmNexPageElement,
-                    public EmValueSource<int32_t>
+                    public EmValue<int32_t>
 {
 public:
-    EmNexInteger(EmNextion& nex, 
-                EmNexPage& page, 
-                const char* name,
-                bool logEnabled=false)
-     : EmNexPageElement(nex, page, name, logEnabled)
-    {}
+    EmNexInteger(EmNexPage& page,
+                 const char* name,
+                 EmLogLevel logLevel=EmLogLevel::none)
+     : EmNexPageElement(page, name, logLevel) {}
 
-    virtual bool GetSourceValue(int32_t& value);
-    virtual bool SetSourceValue(const int32_t value);
+    virtual EmGetValueResult GetValue(int32_t& value) const override {
+        return Nex().GetNumElementValue(PageName(), m_name, value);
+    }
+
+    virtual bool SetValue(int32_t const value) override {
+        return Nex().SetNumElementValue(PageName(), m_name, value);
+    }
 };
 
-class EmNexFloat: public EmNexPageElement,
-                  public EmValueSource<float>
+class EmNexReal: public EmNexPageElement,
+                 public EmValue<nex_real_t>
 {
 public:
-    EmNexFloat(EmNextion& nex, 
-                EmNexPage& page, 
-                const char* name,
-                uint8_t dec_places,
-                bool logEnabled=false)
-    : EmNexPageElement(nex, page, name, logEnabled),
-        m_dec_places(dec_places)
-    {}
+    EmNexReal(EmNexPage& page,
+              const char* name,
+              uint8_t decPlaces,
+              EmLogLevel logLevel=EmLogLevel::none)
+     : EmNexPageElement(page, name, logLevel),
+       m_decPlaces(decPlaces) {}
 
-    virtual bool GetSourceValue(float& value);
-    virtual bool SetSourceValue(const float value);
+    virtual EmGetValueResult GetValue(nex_real_t& value) const override;
+
+    virtual bool SetValue(nex_real_t const value) override {
+        return Nex().SetNumElementValue(PageName(), 
+                                        m_name, 
+                                        iRound(value*iPow10(m_decPlaces)));
+    }
 
 protected:
-    const uint8_t m_dec_places;
+    const uint8_t m_decPlaces;
 };
 
 // A two labels number
-class EmNexDecimal: public EmValueSource<float>
+class EmNexDecimal:public EmNexPageElement,
+                   public EmValue<nex_real_t>
 {
 public:
-    EmNexDecimal(EmNextion& nex, 
-                EmNexPage& page, 
-                const char* int_name,
-                const char* dec_name,
-                uint8_t dec_places,
-                bool logEnabled=false)
-    : m_int_element(nex, page, int_name, logEnabled),
-        m_dec_element(nex, page, dec_name, logEnabled),
-        m_dec_places(dec_places)
-    {}
+    EmNexDecimal(EmNexPage& page,
+                 const char* intElementName,
+                 const char* decElementName,
+                 uint8_t decPlaces,
+                 EmLogLevel logLevel=EmLogLevel::none)
+     : EmNexPageElement(page, intElementName, logLevel),
+       m_decElementName(decElementName),
+       m_decPlaces(decPlaces) {}
 
-    virtual bool GetSourceValue(float& value) { return false; }
-    virtual bool SetSourceValue(const float value);
+    virtual EmGetValueResult GetValue(nex_real_t& value) const override;
+    virtual bool SetValue(nex_real_t const value) override;
 
 protected:
-    EmNexInteger m_int_element;
-    EmNexInteger m_dec_element;
-    const uint8_t m_dec_places;
+    const char* m_decElementName;
+    const uint8_t m_decPlaces;
 };
+
+template<size_t len>
+inline EmGetValueResult EmNextion::GetTextElementValue(
+    const char* pageName, 
+    const char* elementName, 
+    char* txt) const
+{
+    // Create a copy in case communication fails
+    // (i.e. some bytes might be modified by _recv method!)
+    char dispTxt[len+1];
+    strncpy(dispTxt, txt, len);
+    EmGetValueResult res = EmGetValueResult::failed;
+    if (_sendGetCmd(pageName, elementName, "txt")) {
+        res = _getString(dispTxt, sizeof(dispTxt), elementName);    
+    }
+    // Copy the received text int user value
+    if (EmGetValueResult::failed != res) {
+        strcpy(txt, dispTxt);
+    }
+    return res;
+}
 
 #endif
