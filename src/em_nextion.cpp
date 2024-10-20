@@ -280,27 +280,27 @@ EmGetValueResult EmNextion::_getString(char* txt,
     return res;
 }
 
-EmGetValueResult EmNexReal::GetValue(nex_real_t& value) const 
-{
-    int32_t val = iMolt(value, iPow10(m_decPlaces));
-    EmGetValueResult res = Nex().GetNumElementValue(Page().Name(), m_name, val);
-    if (EmGetValueResult::failed != res) {
-        value = static_cast<nex_real_t>(val)/pow(10, m_decPlaces);
-    }
-    return res;
-}
-
-bool EmNexDecimal::SetValue(nex_real_t const value) 
+bool EmNexDecimal::SetValue(double const value) 
 {
     int32_t exp = iPow10(m_decPlaces);
-    int32_t dispValue = iRound(value*static_cast<nex_real_t>(exp));
+    int32_t dispValue = iRound(value*static_cast<double>(exp));
     return Nex().SetNumElementValue(Page().Name(), m_name, iDiv(dispValue, exp)) &&
            Nex().SetNumElementValue(Page().Name(), m_decElementName, dispValue % exp);        
 }
 
-EmGetValueResult EmNexDecimal::GetValue(nex_real_t& value) const 
+EmGetValueResult EmNexDecimal::GetValue(float& value) const
+{
+    double val;
+    EmGetValueResult res = GetValue(val);
+    if (EmGetValueResult::failed != res) {
+        value = static_cast<float>(val);
+    }
+    return res;
+}
+
+EmGetValueResult EmNexDecimal::GetValue(double& value) const 
 { 
-    nex_real_t prevValue = value;
+    double prevValue = value;
     EmGetValueResult res;
     int32_t intVal;
     res = Nex().GetNumElementValue(Page().Name(), m_name, intVal);
@@ -312,7 +312,7 @@ EmGetValueResult EmNexDecimal::GetValue(nex_real_t& value) const
     if (res == EmGetValueResult::failed) {
         return EmGetValueResult::failed;
     }
-    value = intVal+(static_cast<nex_real_t>(decVal)/pow(10, m_decPlaces));
+    value = intVal+(static_cast<double>(decVal)/pow(10, m_decPlaces));
 
     return prevValue == value ? 
            EmGetValueResult::succeedEqualValue :

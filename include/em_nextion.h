@@ -22,12 +22,6 @@ enum EmNextionRet: uint8_t {
     INVALID_OPERATION = 0x1B
 };
 
-#ifdef NEX_REAL_AS_DOUBLE
-typedef double nex_real_t;
-#else
-typedef float nex_real_t;
-#endif
-
 class EmNextion: public EmLog {
 public:
     EmNextion(EmComSerial& serial, 
@@ -197,6 +191,18 @@ public:
                  EmLogLevel logLevel=EmLogLevel::none)
      : EmNexPageElement(page, name, logLevel) {}
 
+    // Templated methods (not virtual)
+    template <class int_type>
+    EmGetValueResult GetValue(int_type& value) const {
+        int32_t val = static_cast<int32_t>(value);
+        EmGetValueResult res = GetValue(val);
+        if (EmGetValueResult::failed != res) {
+            value = static_cast<int_type>(val);
+        }
+        return res;
+    }
+
+    // virtual 'EmValue' overrides (cannot be templated)
     virtual EmGetValueResult GetValue(int32_t& value) const override {
         return Nex().GetNumElementValue(PageName(), m_name, value);
     }
@@ -207,7 +213,7 @@ public:
 };
 
 class EmNexReal: public EmNexPageElement,
-                 public EmValue<nex_real_t>
+                 public EmValue<double>
 {
 public:
     EmNexReal(EmNexPage& page,
@@ -217,12 +223,31 @@ public:
      : EmNexPageElement(page, name, logLevel),
        m_decPlaces(decPlaces) {}
 
-    virtual EmGetValueResult GetValue(nex_real_t& value) const override;
-
-    virtual bool SetValue(nex_real_t const value) override {
+    // Templated methods (not virtual)
+    template <class real_type>
+    EmGetValueResult GetValue(real_type& value) const {
+        int32_t val = iMolt<real_type>(value, iPow10(m_decPlaces));
+        EmGetValueResult res = Nex().GetNumElementValue(Page().Name(), m_name, val);
+        if (EmGetValueResult::failed != res) {
+            value = static_cast<real_type>(val)/pow(10, m_decPlaces);
+        }
+        return res;
+    }
+ 
+    template <class real_type>
+    bool SetValue(real_type const value) {
         return Nex().SetNumElementValue(PageName(), 
                                         m_name, 
-                                        iRound(value*iPow10(m_decPlaces)));
+                                        iRound<real_type>(value*iPow10(m_decPlaces)));
+    }
+
+    // virtual 'EmValue' overrides (cannot be templated)
+    virtual EmGetValueResult GetValue(double& value) const override {
+        return GetValue<double>(value);
+    }
+
+    virtual bool SetValue(double const value) override {
+        return SetValue<double>(value);
     }
 
 protected:
@@ -231,7 +256,7 @@ protected:
 
 // A two labels number
 class EmNexDecimal:public EmNexPageElement,
-                   public EmValue<nex_real_t>
+                   public EmValue<double>
 {
 public:
     EmNexDecimal(EmNexPage& page,
@@ -243,8 +268,9 @@ public:
        m_decElementName(decElementName),
        m_decPlaces(decPlaces) {}
 
-    virtual EmGetValueResult GetValue(nex_real_t& value) const override;
-    virtual bool SetValue(nex_real_t const value) override;
+    virtual EmGetValueResult GetValue(float& value) const;
+    virtual EmGetValueResult GetValue(double& value) const override;
+    virtual bool SetValue(double const value) override;
 
 protected:
     const char* m_decElementName;

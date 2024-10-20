@@ -2,3 +2,6 @@
 # 1.0.1
 # 1.0.2
 - first releases with several adjustments and fixes
+
+# 1.0.3
+- New templated 'Get' and 'Set' methods to avoid conversions
