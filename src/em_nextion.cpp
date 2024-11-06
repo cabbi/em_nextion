@@ -134,6 +134,11 @@ bool EmNextion::_ack(uint8_t ackCode) const
     return EmGetValueResult::failed != _recv(ackCode, NULL, 0);
 }
 
+bool EmNextion::IsCurPage(uint8_t pageId) const {
+    uint8_t id;
+    return GetCurPage(id) && id == pageId;
+}
+
 bool EmNextion::GetCurPage(uint8_t& pageId) const 
 {
     if (!_sendCmd("sendme", NULL)) {
@@ -206,6 +211,25 @@ bool EmNextion::SetTextElementValue(const char* pageName,
                  txt,
                  (res ? " [SUCCESS]" : " [FAIL]"));
     return res;
+}
+
+bool EmNextion::SetVisible(const char* elementName, 
+                           bool visible) const {
+    bool res = false;
+    if (_sendCmd("vis ", elementName, visible ? ",1" : ",0", NULL)) {
+        res = _ack(ACK_CMD_SUCCEED);
+    }
+    LogDebug<50>("visible: %s -> %s [%s]", 
+                 elementName,
+                 visible,
+                 (res ? " [SUCCESS]" : " [FAIL]"));
+    return res;
+}
+
+bool EmNextion::SetVisible(uint8_t pageId, 
+                           const char* elementName, 
+                           bool visible) const {
+    return IsCurPage(pageId) && SetVisible(elementName, visible);
 }
 
 bool EmNextion::_sendGetCmd(const char* pageName, 

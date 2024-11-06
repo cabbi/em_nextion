@@ -1,6 +1,6 @@
 {
   "name": "EmNextion",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Embedded Nextion display communication library",
   "keywords": ["display", "nextion"],
   "repository": {

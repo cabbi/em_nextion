@@ -34,6 +34,7 @@ public:
         return m_IsInit;
     }
 
+    bool IsCurPage(uint8_t pageId) const;
     bool GetCurPage(uint8_t& pageId) const;
     bool SetCurPage(uint8_t pageId) const;
     bool SetCurPage(const char* pageName) const;
@@ -52,6 +53,19 @@ public:
     bool SetTextElementValue(const char* pageName, 
                              const char* elementName, 
                              const char* txt) const;
+
+    // Set element visibility.
+    //
+    // NOTES:
+    //  1. element should be in current page
+    //  2. visibility attribute is reset if page is changed 
+    //     or display recovers from screen saver
+    bool SetVisible(const char* elementName, 
+                    bool visible) const;
+
+    bool SetVisible(uint8_t pageId, 
+                    const char* elementName, 
+                    bool visible) const;
 
 protected:
     bool _sendGetCmd(const char* pageName, 
@@ -120,8 +134,7 @@ public:
     }
 
     bool IsCurrent() const {
-        uint8_t id;
-        return Nex().GetCurPage(id) && id == m_id;
+        return Nex().IsCurPage(m_id);
     }
 
 protected:
@@ -148,6 +161,16 @@ public:
 
     const char* PageName() const {
         return m_page.Name();
+    }
+
+    // Set element visibility.
+    //
+    // NOTES:
+    //  1. element should be in current page
+    //  2. visibility attribute is reset if page is changed 
+    //     or display recovers from screen saver
+    bool SetVisible(bool visible) const {
+        return Nex().SetVisible(m_page.Id(), m_name, visible);
     }
 
 protected:
