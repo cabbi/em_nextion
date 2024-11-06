@@ -232,6 +232,94 @@ bool EmNextion::SetVisible(uint8_t pageId,
     return IsCurPage(pageId) && SetVisible(elementName, visible);
 }
 
+bool EmNextion::SetPicture(const char* pageName, 
+                           const char* elementName, 
+                           uint8_t picId) const {
+    bool res = false;
+    if (_sendSetCmd(pageName, elementName, "pic", picId)) {
+        res = _ack(ACK_CMD_SUCCEED);
+    }
+    LogDebug<50>("pic: %s -> %s [%s]", 
+                 elementName,
+                 picId,
+                 (res ? " [SUCCESS]" : " [FAIL]"));
+    return res;
+}
+
+bool EmNextion::GetPicture(const char* pageName, 
+                           const char* elementName, 
+                           uint8_t& picId) const {
+    bool res = false;
+    if (_sendGetCmd(pageName, elementName, "val")) {
+        int32_t val;
+        res = _getNumber(val) != EmGetValueResult::failed;
+        if (res) {
+            picId = static_cast<uint8_t>(val);
+        }
+    }
+    LogDebug<50>("pic: %s -> %d [%s]", 
+                 elementName,
+                 picId,
+                 res ? " [SUCCESS]" : " [FAIL]");
+    return res;
+}
+
+bool EmNextion::Click(const char* elementName, 
+                      bool pressed) const {
+    bool res = false;
+    if (_sendCmd("click ", elementName, pressed ? ",1" : ",0", NULL)) {
+        res = _ack(ACK_CMD_SUCCEED);
+    }
+    LogDebug<50>("click: %s -> %s [%s]", 
+                 elementName,
+                 pressed,
+                 (res ? " [SUCCESS]" : " [FAIL]"));
+    return res;
+}
+
+bool EmNextion::Click(uint8_t pageId, 
+                      const char* elementName, 
+                      bool pressed) const {
+    return IsCurPage(pageId) && Click(elementName, pressed);
+}
+
+
+bool EmNextion::_setColor(const char* pageName, 
+                          const char* elementName, 
+                          const char* colorCode, 
+                          uint16_t color565) const{
+    bool res = false;
+    if (_sendSetCmd(pageName, elementName, colorCode, color565)) {
+        res = _ack(ACK_CMD_SUCCEED);
+    }
+    LogDebug<50>("%s: %s -> %s [%s]", 
+                 colorCode,
+                 elementName,
+                 color565,
+                 (res ? " [SUCCESS]" : " [FAIL]"));
+    return res;
+}
+
+bool EmNextion::_getColor(const char* pageName, 
+                          const char* elementName, 
+                          const char* colorCode, 
+                          uint16_t& color565) const {
+    bool res = false;
+    if (_sendGetCmd(pageName, elementName, colorCode)) {
+        int32_t val;
+        res = _getNumber(val) != EmGetValueResult::failed;
+        if (res) {
+            color565 = static_cast<uint16_t>(val);
+        }
+    }
+    LogDebug<50>("%s: %s -> %s [%s]", 
+                 colorCode,
+                 elementName,
+                 color565,
+                 (res ? " [SUCCESS]" : " [FAIL]"));
+    return res;
+}
+
 bool EmNextion::_sendGetCmd(const char* pageName, 
                   const char* elementName, 
                   const char* property) const

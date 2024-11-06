@@ -8,3 +8,6 @@
 
 # 1.0.4
 - Added 'SetVisible' methods to set objects visibility
+- Added Set & Get Picture
+- Added Set & Get Background and Font color
+- Added Click method
