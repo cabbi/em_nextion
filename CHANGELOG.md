@@ -2,3 +2,15 @@
 # 1.0.1
 # 1.0.2
 - first releases with several adjustments and fixes
+
+# 1.0.3
+- New templated 'Get' and 'Set' methods to avoid conversions
+
+# 1.0.4
+- Removed 'timeoutMs' default value from 'EmNextion' constructor since its strongly dependant from serial baud rate              
+- Added 'SetVisible' methods to set objects visibility
+- Added Set & Get Picture
+- Added Set & Get Background and Font color
+- Added Click method
+- Added "dummy" example
+- Added 'TODO.md' file

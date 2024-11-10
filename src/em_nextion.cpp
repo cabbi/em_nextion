@@ -28,10 +28,8 @@ bool EmNextion::Init() const
 bool EmNextion::_sendCmd(const char* firstCmd, ...) const
 {
     // Before sending let's see if display is active/connected
-    if (!m_IsInit) {
-        if (!Init()) {
-            return false;
-        } 
+    if (!m_IsInit && !Init()) {
+        return false;
     }
     m_Serial.flush();
     _sendCmdParam(firstCmd);
@@ -49,14 +47,14 @@ bool EmNextion::_sendCmd(const char* firstCmd, ...) const
 
 bool EmNextion::_sendCmdParam(const char* cmdParam) const
 {
-    return m_Serial.write(cmdParam) > 0;
+    return _bResult(m_Serial.write(cmdParam) > 0);
 }
 
 bool EmNextion::_sendCmdEnd() const
 {
     m_Serial.write(0xFF);
     m_Serial.write(0xFF);
-    return m_Serial.write(0xFF) == 1;
+    return _bResult(m_Serial.write(0xFF) == 1);
 }
 
 EmGetValueResult EmNextion::_recv(uint8_t ackCode, 
@@ -113,7 +111,7 @@ EmGetValueResult EmNextion::_recv(uint8_t ackCode,
             }
         }
     }
-    LogDebug<50>("RX: %s [SUCCESS]", buf);
+    LogDebug<50>("RX: %s [Timeout elapsed!]", buf);
     return _result(false, value_changed);
 }
 
@@ -128,10 +126,23 @@ EmGetValueResult EmNextion::_result(bool result, bool valueChanged) const
            EmGetValueResult::succeedEqualValue;
 }
 
+bool EmNextion::_bResult(bool result) const
+{ 
+    if (!result) { 
+        m_IsInit = false;
+    }
+    return result;
+}
+
 bool EmNextion::_ack(uint8_t ackCode) const 
 {
     LogDebug(F("Waiting ACK"));
     return EmGetValueResult::failed != _recv(ackCode, NULL, 0);
+}
+
+bool EmNextion::IsCurPage(uint8_t pageId) const {
+    uint8_t id;
+    return GetCurPage(id) && id == pageId;
 }
 
 bool EmNextion::GetCurPage(uint8_t& pageId) const 
@@ -208,6 +219,113 @@ bool EmNextion::SetTextElementValue(const char* pageName,
     return res;
 }
 
+bool EmNextion::SetVisible(const char* elementName, 
+                           bool visible) const {
+    bool res = false;
+    if (_sendCmd("vis ", elementName, visible ? ",1" : ",0", NULL)) {
+        res = _ack(ACK_CMD_SUCCEED);
+    }
+    LogDebug<50>("visible: %s -> %s [%s]", 
+                 elementName,
+                 visible,
+                 (res ? " [SUCCESS]" : " [FAIL]"));
+    return res;
+}
+
+bool EmNextion::SetVisible(uint8_t pageId, 
+                           const char* elementName, 
+                           bool visible) const {
+    return IsCurPage(pageId) && SetVisible(elementName, visible);
+}
+
+bool EmNextion::SetPicture(const char* pageName, 
+                           const char* elementName, 
+                           uint8_t picId) const {
+    bool res = false;
+    if (_sendSetCmd(pageName, elementName, "pic", picId)) {
+        res = _ack(ACK_CMD_SUCCEED);
+    }
+    LogDebug<50>("pic: %s -> %s [%s]", 
+                 elementName,
+                 picId,
+                 (res ? " [SUCCESS]" : " [FAIL]"));
+    return res;
+}
+
+bool EmNextion::GetPicture(const char* pageName, 
+                           const char* elementName, 
+                           uint8_t& picId) const {
+    bool res = false;
+    if (_sendGetCmd(pageName, elementName, "val")) {
+        int32_t val;
+        res = _getNumber(val) != EmGetValueResult::failed;
+        if (res) {
+            picId = static_cast<uint8_t>(val);
+        }
+    }
+    LogDebug<50>("pic: %s -> %d [%s]", 
+                 elementName,
+                 picId,
+                 res ? " [SUCCESS]" : " [FAIL]");
+    return res;
+}
+
+bool EmNextion::Click(const char* elementName, 
+                      bool pressed) const {
+    bool res = false;
+    if (_sendCmd("click ", elementName, pressed ? ",1" : ",0", NULL)) {
+        res = _ack(ACK_CMD_SUCCEED);
+    }
+    LogDebug<50>("click: %s -> %s [%s]", 
+                 elementName,
+                 pressed,
+                 (res ? " [SUCCESS]" : " [FAIL]"));
+    return res;
+}
+
+bool EmNextion::Click(uint8_t pageId, 
+                      const char* elementName, 
+                      bool pressed) const {
+    return IsCurPage(pageId) && Click(elementName, pressed);
+}
+
+
+bool EmNextion::_setColor(const char* pageName, 
+                          const char* elementName, 
+                          const char* colorCode, 
+                          uint16_t color565) const{
+    bool res = false;
+    if (_sendSetCmd(pageName, elementName, colorCode, color565)) {
+        res = _ack(ACK_CMD_SUCCEED);
+    }
+    LogDebug<50>("%s: %s -> %s [%s]", 
+                 colorCode,
+                 elementName,
+                 color565,
+                 (res ? " [SUCCESS]" : " [FAIL]"));
+    return res;
+}
+
+bool EmNextion::_getColor(const char* pageName, 
+                          const char* elementName, 
+                          const char* colorCode, 
+                          uint16_t& color565) const {
+    bool res = false;
+    if (_sendGetCmd(pageName, elementName, colorCode)) {
+        int32_t val;
+        res = _getNumber(val) != EmGetValueResult::failed;
+        if (res) {
+            color565 = static_cast<uint16_t>(val);
+        }
+    }
+    LogDebug<50>("%s: %s -> %s [%s]", 
+                 colorCode,
+                 elementName,
+                 color565,
+                 (res ? " [SUCCESS]" : " [FAIL]"));
+    return res;
+}
+
 bool EmNextion::_sendGetCmd(const char* pageName, 
                   const char* elementName, 
                   const char* property) const
@@ -280,27 +398,27 @@ EmGetValueResult EmNextion::_getString(char* txt,
     return res;
 }
 
-EmGetValueResult EmNexReal::GetValue(nex_real_t& value) const 
-{
-    int32_t val = iMolt(value, iPow10(m_decPlaces));
-    EmGetValueResult res = Nex().GetNumElementValue(Page().Name(), m_name, val);
-    if (EmGetValueResult::failed != res) {
-        value = static_cast<nex_real_t>(val)/pow(10, m_decPlaces);
-    }
-    return res;
-}
-
-bool EmNexDecimal::SetValue(nex_real_t const value) 
+bool EmNexDecimal::SetValue(double const value) 
 {
     int32_t exp = iPow10(m_decPlaces);
-    int32_t dispValue = iRound(value*static_cast<nex_real_t>(exp));
+    int32_t dispValue = iRound(value*static_cast<double>(exp));
     return Nex().SetNumElementValue(Page().Name(), m_name, iDiv(dispValue, exp)) &&
            Nex().SetNumElementValue(Page().Name(), m_decElementName, dispValue % exp);        
 }
 
-EmGetValueResult EmNexDecimal::GetValue(nex_real_t& value) const 
+EmGetValueResult EmNexDecimal::GetValue(float& value) const
+{
+    double val;
+    EmGetValueResult res = GetValue(val);
+    if (EmGetValueResult::failed != res) {
+        value = static_cast<float>(val);
+    }
+    return res;
+}
+
+EmGetValueResult EmNexDecimal::GetValue(double& value) const 
 { 
-    nex_real_t prevValue = value;
+    double prevValue = value;
     EmGetValueResult res;
     int32_t intVal;
     res = Nex().GetNumElementValue(Page().Name(), m_name, intVal);
@@ -312,7 +430,7 @@ EmGetValueResult EmNexDecimal::GetValue(nex_real_t& value) const
     if (res == EmGetValueResult::failed) {
         return EmGetValueResult::failed;
     }
-    value = intVal+(static_cast<nex_real_t>(decVal)/pow(10, m_decPlaces));
+    value = intVal+(static_cast<double>(decVal)/pow(10, m_decPlaces));
 
     return prevValue == value ? 
            EmGetValueResult::succeedEqualValue :
