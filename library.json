@@ -1,6 +1,6 @@
 {
   "name": "EmNextion",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Embedded Nextion display communication library",
   "keywords": ["display", "nextion"],
   "repository": {
@@ -13,7 +13,7 @@
   },  
   "license": "BSD-3-Clause",
   "dependencies": {
-    "cabbi/EmCore": "~1.0.4"
+    "cabbi/EmCore": "~1.0.5"
   },  
   "frameworks": ["arduino"],
   "platforms": "*"

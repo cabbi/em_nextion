@@ -14,3 +14,6 @@
 - Added Click method
 - Added "dummy" example
 - Added 'TODO.md' file
+
+# 1.0.5
+- Adjusted dependency on EmCore version 1.0.5
