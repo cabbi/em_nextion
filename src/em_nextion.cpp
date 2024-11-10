@@ -28,10 +28,8 @@ bool EmNextion::Init() const
 bool EmNextion::_sendCmd(const char* firstCmd, ...) const
 {
     // Before sending let's see if display is active/connected
-    if (!m_IsInit) {
-        if (!Init()) {
-            return false;
-        } 
+    if (!m_IsInit && !Init()) {
+        return false;
     }
     m_Serial.flush();
     _sendCmdParam(firstCmd);
@@ -49,14 +47,14 @@ bool EmNextion::_sendCmd(const char* firstCmd, ...) const
 
 bool EmNextion::_sendCmdParam(const char* cmdParam) const
 {
-    return m_Serial.write(cmdParam) > 0;
+    return _bResult(m_Serial.write(cmdParam) > 0);
 }
 
 bool EmNextion::_sendCmdEnd() const
 {
     m_Serial.write(0xFF);
     m_Serial.write(0xFF);
-    return m_Serial.write(0xFF) == 1;
+    return _bResult(m_Serial.write(0xFF) == 1);
 }
 
 EmGetValueResult EmNextion::_recv(uint8_t ackCode, 
@@ -113,7 +111,7 @@ EmGetValueResult EmNextion::_recv(uint8_t ackCode,
             }
         }
     }
-    LogDebug<50>("RX: %s [SUCCESS]", buf);
+    LogDebug<50>("RX: %s [Timeout elapsed!]", buf);
     return _result(false, value_changed);
 }
 
@@ -126,6 +124,14 @@ EmGetValueResult EmNextion::_result(bool result, bool valueChanged) const
     return valueChanged ? 
            EmGetValueResult::succeedNotEqualValue : 
            EmGetValueResult::succeedEqualValue;
+}
+
+bool EmNextion::_bResult(bool result) const
+{ 
+    if (!result) { 
+        m_IsInit = false;
+    }
+    return result;
 }
 
 bool EmNextion::_ack(uint8_t ackCode) const 

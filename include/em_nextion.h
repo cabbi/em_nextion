@@ -54,7 +54,7 @@ void FromColor565(uint16_t color565, uint8_t& red, uint8_t& green, uint8_t& blue
 class EmNextion: public EmLog {
 public:
     EmNextion(EmComSerial& serial, 
-              uint32_t timeoutMs=10, 
+              uint32_t timeoutMs, 
               EmLogLevel logLevel=EmLogLevel::none);
 
     bool Init() const;
@@ -219,6 +219,7 @@ protected:
                            uint8_t len, 
                            bool isText=false) const;
     EmGetValueResult _result(bool result, bool valueChanged) const;
+    bool _bResult(bool result) const;
 
     bool _setColor(const char* pageName, 
                    const char* elementName, 
@@ -270,6 +271,10 @@ public:
 
     bool IsCurrent() const {
         return Nex().IsCurPage(m_id);
+    }
+
+    bool SetAsCurrent() const {
+        return Nex().SetCurPage(m_id);
     }
 
 protected:
