@@ -40,11 +40,11 @@ enum EmNexColor: uint16_t {
 //   Example:
 //     24-bit RGB 11011000 11011000 11011000
 //     16-bit 565 11011 +  110110 + 11011
-uint16_t ToColor565(uint8_t red, uint8_t green, uint8_t blue) {
+inline uint16_t ToColor565(uint8_t red, uint8_t green, uint8_t blue) {
     return ((red>>3) << 11) | ((green>>2) << 5) | (blue >> 3);
 }
 
-void FromColor565(uint16_t color565, uint8_t& red, uint8_t& green, uint8_t& blue) {
+inline void FromColor565(uint16_t color565, uint8_t& red, uint8_t& green, uint8_t& blue) {
     red = (color565 & 0xF800) >> 8;    // rrrrr... ........ -> rrrrr000
     green = (color565 & 0x07E0) >> 3;  // .....ggg ggg..... -> gggggg00
     blue = (color565 & 0x1F) << 3;     // ............bbbbb -> bbbbb000
