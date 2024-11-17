@@ -17,3 +17,6 @@
 
 # 1.0.5
 - Adjusted dependency on EmCore version 1.0.5
+  
+# 1.0.6
+- Reduced RAM footprint by templating the page and splitting 'EmValue' derived classes 
