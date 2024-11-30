@@ -363,18 +363,13 @@ bool EmNextion::_sendSetCmd(const char* pageName,
 EmGetValueResult EmNextion::_getNumber(int32_t& val) const 
 {
     // Create a copy in case communication fails 
-    //(i.e. some bytes might be modified by _recv method!)
-    char buf[4];
-    // TODO: Nextion is little endian, should we check about big endian CPU?
-    memcpy(buf, &val, sizeof(buf));
-
-    EmGetValueResult res = _recv(ACK_NUMBER, buf, sizeof(buf));
+    // (i.e. some bytes might be modified by _recv method!)
+    int32_t buf = val;
+    EmGetValueResult res = _recv(ACK_NUMBER, (char*)&buf, sizeof(buf));
 
     if (EmGetValueResult::failed != res) {
-        val = ((int32_t)buf[3]<<24) | 
-              ((int32_t)buf[2]<<16) | 
-              ((int32_t)buf[1]<<8) | 
-              ((int32_t)buf[0]);        
+        // TODO: Nextion is little endian, should we check about big endian CPU?
+        val = buf;        
     }
     return res;
 }

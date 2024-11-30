@@ -20,3 +20,6 @@
   
 # 1.0.6
 - Reduced RAM footprint by templating the page and splitting 'EmValue' derived classes 
+
+# 1.0.7
+- BUG fix in '_getNumber' method 
