@@ -28,58 +28,58 @@ void setup() {
 
 void loop() {
     bool bRes;
-    bRes = display.SetVisible(0, "p_temp", false);
+    bRes = display.setVisible(0, "p_temp", false);
     delay(1000);
-    bRes = display.SetVisible("p_temp", true);
+    bRes = display.setVisible("p_temp", true);
 
     uint16_t bkCol = 0, fontCol = 0;
-    bRes = decimalNumber.GetBkColor(bkCol);
-    bRes = decimalNumber.GetFontColor(fontCol);
+    bRes = decimalNumber.getBkColor(bkCol);
+    bRes = decimalNumber.getFontColor(fontCol);
     delay(1000);
-    bRes = decimalNumber.SetBkColor(EmNexColor::BROWN);
-    bRes = decimalNumber.SetFontColor(EmNexColor::BLUE);
+    bRes = decimalNumber.setBkColor(EmNexColor::BROWN);
+    bRes = decimalNumber.setFontColor(EmNexColor::BLUE);
     delay(1000);
-    bRes = decimalNumber.SetBkColor(bkCol);
-    bRes = decimalNumber.SetFontColor(fontCol);
+    bRes = decimalNumber.setBkColor(bkCol);
+    bRes = decimalNumber.setFontColor(fontCol);
 
-    bRes = cfgBtn.Click();
+    bRes = cfgBtn.click();
     delay(5000);
-    bRes = mainPage.SetAsCurrent();
+    bRes = mainPage.setAsCurrent();
 
     EmGetValueResult res;
     EmString<20> captionTxt;
-    res = caption.GetValue<10>(captionTxt.Buffer());
+    res = caption.getValue<10>(captionTxt.Buffer());
 
     int32_t num=10000;
-    res = display.GetNumElementValue("p_main", "tr_1", num);
+    res = display.getNumElementValue("p_main", "tr_1", num);
 
     uint8_t pageId;
-    if (!display.GetCurPage(pageId)) {
+    if (!display.getCurPage(pageId)) {
         printf("GetCurPage failed!");
     }
 
-    if (!decimalNumber.SetValue(12.5)) {
+    if (!decimalNumber.setValue(12.5)) {
         printf("Set number failed!");
     }
 
     double dblVal = 1234;
-    res = decimalNumber.GetValue(dblVal);
-    res = decimalNumber.GetValue(dblVal);
+    res = decimalNumber.getValue(dblVal);
+    res = decimalNumber.getValue(dblVal);
 
-    if (!caption.SetValue("This is a test!")) {
+    if (!caption.setValue("This is a test!")) {
         printf("Set caption text failed!");
     }
 
     delay(1000);
 
-    if (!alertLabel.SetValue("This test is very long\\rmessage!!!")) {
+    if (!alertLabel.setValue("This test is very long\\rmessage!!!")) {
         printf("Set alert text failed!");
     }
 
-    if (!alertPage.SetAsCurrent()) {
+    if (!alertPage.setAsCurrent()) {
         printf("SetCurPage failed!");
     }
 
     delay(10000);
-    mainPage.SetAsCurrent();
+    mainPage.setAsCurrent();
 }

@@ -8,7 +8,7 @@
 
 # 1.0.4
 - Removed 'timeoutMs' default value from 'EmNextion' constructor since its strongly dependant from serial baud rate              
-- Added 'SetVisible' methods to set objects visibility
+- Added 'setVisible' methods to set objects visibility
 - Added Set & Get Picture
 - Added Set & Get Background and Font color
 - Added Click method
@@ -23,3 +23,7 @@
 
 # 1.0.7
 - BUG fix in '_getNumber' method 
+
+# 2.0.0
+- Aligned to new EmCore 2.0.0 code restyling
+- Added 'EmNexCfgInteger' to handle configuration parameters that need to be set/initialized at startup
