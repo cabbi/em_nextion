@@ -27,3 +27,7 @@
 # 2.0.0
 - Aligned to new EmCore 2.0.0 code restyling
 - Added 'EmNexCfgInteger' to handle configuration parameters that need to be set/initialized at startup
+
+# 2.1.0
+- Added 'EmNexIntegerTag', 'EmNexRealTag' and 'EmNexDecimalTag' to support a persistent value in the 'EmTags' class
+- Typo fixes

@@ -8,6 +8,7 @@
 #include "em_optional.h"
 #include "em_com_device.h"
 #include "em_sync_value.h"
+#include "em_tag.h"
 
 // Nextion defined result codes
 enum EmNextionRet: uint8_t {
@@ -467,6 +468,30 @@ public:
     }
 };
 
+// Use 'EmNexTextTag' class if you need an 'EmTagValue' object 
+template<EmNexPage& tPage>
+class EmNexTextTag: public EmNexText<tPage>,
+                    public EmTagInterface
+{
+public:
+     EmNexTextTag(const char* name,
+                  EmSyncFlags flags,
+                  EmLogLevel logLevel=EmLogLevel::none)
+     : EmNexText<tPage>(name, logLevel), 
+       EmTagInterface(flags) {}
+
+    virtual const char* getId() const override {
+        return this->m_name;
+    }
+
+    virtual EmGetValueResult getValue(EmTagValue& value) const {
+
+    }
+
+    virtual bool setValue(EmTagValue& value) override {
+    }
+};
+
 template<EmNexPage& tPage>
 class EmNexInteger: public EmNexColoredElement<tPage>
 {
@@ -492,7 +517,7 @@ public:
                                               value);
     }
 
-    bool setValue(int32_t const value) const {
+    bool setValue(const int32_t value) const {
         return this->nex().setNumElementValue(this->pageName(), 
                                               this->m_name, 
                                               value);
@@ -514,8 +539,49 @@ public:
         return EmNexInteger<tPage>::getValue(value);
     }
 
-    virtual bool setValue(int32_t const value) override {
+    virtual bool setValue(const int32_t value) override {
         return EmNexInteger<tPage>::setValue(value);
+    }
+};
+
+// Use 'EmNexIntegerTag' class if you need an 'EmTagValue' object 
+template<EmNexPage& tPage>
+class EmNexIntegerTag: public EmNexInteger<tPage>,
+                       public EmTagInterface
+{
+public:
+    EmNexIntegerTag(const char* name,
+                    EmSyncFlags flags,
+                    EmLogLevel logLevel=EmLogLevel::none)
+     : EmNexInteger<tPage>(name, logLevel),
+       EmTagInterface(flags) {}
+    
+    virtual const char* getId() const override {
+        return this->m_name;
+    }
+
+    virtual EmTagValue getValue() const {
+        EmTagValue val(EmTagValueType::vt_integer);
+        this->getValue(val);    
+        return val;
+    }
+
+    virtual EmGetValueResult getValue(EmTagValue& value) const override {
+        int32_t val;
+        EmGetValueResult res = EmNexInteger<tPage>::getValue(val);
+        if (EmGetValueResult::failed != res) {
+            value.setValue(val, true);
+        }
+        return res;
+    }
+
+    virtual bool setValue(const EmTagValue& value) override {
+        if (value.getType() != EmTagValueType::vt_integer) {
+            return false;
+        }
+        EmTagValueStruct out;
+        value.toStruct(out);
+        return EmNexInteger<tPage>::setValue(out.m_value.as_integer);
     }
 };
 
@@ -533,7 +599,7 @@ public:
     template <class real_type>
     EmGetValueResult getValue(real_type& value) const {
         int32_t val = iMolt<real_type>(value, iPow10(m_decPlaces));
-        EmGetValueResult res = this->nex().getNumElementValue(this->page().Name(), 
+        EmGetValueResult res = this->nex().getNumElementValue(this->pageName(), 
                                                               this->m_name, 
                                                               val);
         if (EmGetValueResult::failed != res) {
@@ -544,7 +610,7 @@ public:
  
     template <class real_type>
     bool setValue(real_type const value) {
-        return this->nex().setNumElementValue(this->PageName(), 
+        return this->nex().setNumElementValue(this->pageName(), 
                                              this->m_name, 
                                              iRound<real_type>(value*iPow10(m_decPlaces)));
     }
@@ -553,7 +619,7 @@ public:
         return getValue<double>(value);
     }
 
-    bool setValue(double const value) const {
+    bool setValue(double value) const {
         return setValue<double>(value);
     }
 
@@ -568,8 +634,8 @@ class EmNexRealEx: public EmNexReal<tPage>,
 {
 public:
     EmNexRealEx(const char* name,
-              uint8_t decPlaces,
-              EmLogLevel logLevel=EmLogLevel::none)
+                uint8_t decPlaces,
+                EmLogLevel logLevel=EmLogLevel::none)
      : EmNexReal<tPage>(name, logLevel),
        EmValue<double>() {}
 
@@ -577,8 +643,50 @@ public:
         return EmNexReal<tPage>::getValue(value);
     }
 
-    virtual bool setValue(double const value) override {
+    virtual bool setValue(const double& value) override {
         return EmNexReal<tPage>::setValue(value);
+    }
+};
+
+// Use 'EmNexRealTag' class if you need an 'EmTagValue' object 
+template<EmNexPage& tPage>
+class EmNexRealTag: public EmNexReal<tPage>,
+                    public EmTagInterface
+{
+public:
+    EmNexRealTag(const char* name,
+                 uint8_t decPlaces,
+                 EmSyncFlags flags,
+                 EmLogLevel logLevel=EmLogLevel::none)
+     : EmNexReal<tPage>(name, decPlaces, logLevel),
+       EmTagInterface(flags) {}
+    
+    virtual const char* getId() const override {
+        return this->m_name;
+    }
+
+    virtual EmTagValue getValue() const {
+        EmTagValue val(EmTagValueType::vt_real);
+        this->getValue(val);    
+        return val;
+    }
+
+    virtual EmGetValueResult getValue(EmTagValue& value) const override {
+        double val;
+        EmGetValueResult res = EmNexReal<tPage>::getValue(val);
+        if (EmGetValueResult::failed != res) {
+            value.setValue(val, true);
+        }
+        return res;
+    }
+
+    virtual bool setValue(const EmTagValue& value) override {
+        if (value.getType() != EmTagValueType::vt_real) {
+            return false;
+        }
+        EmTagValueStruct out;
+        value.toStruct(out);
+        return EmNexReal<tPage>::setValue(out.m_value.as_real);
     }
 };
 
@@ -595,13 +703,13 @@ public:
        m_decElementName(decElementName),
        m_decPlaces(decPlaces) {}
 
-    bool setValue(double const value) {
+    bool setValue(double value) {
         int32_t exp = iPow10(this->m_decPlaces);
         int32_t dispValue = iRound(value*static_cast<double>(exp));
-        return this->nex().setNumElementValue(this->page().name(), 
+        return this->nex().setNumElementValue(this->pageName(), 
                                               this->m_name, 
                                               iDiv(dispValue, exp)) &&
-               this->nex().setNumElementValue(this->page().name(), 
+               this->nex().setNumElementValue(this->pageName(), 
                                               this->m_decElementName, 
                                               dispValue % exp);        
     }
@@ -619,14 +727,14 @@ public:
         double prevValue = value;
         EmGetValueResult res;
         int32_t intVal;
-        res = this->nex().getNumElementValue(this->page().Name(), 
+        res = this->nex().getNumElementValue(this->pageName(), 
                                              this->m_name, 
                                              intVal);
         if (res == EmGetValueResult::failed) {
             return EmGetValueResult::failed;
         }
         int32_t decVal;
-        res = this->nex().getNumElementValue(this->page().Name(), 
+        res = this->nex().getNumElementValue(this->pageName(), 
                                              m_decElementName, 
                                              decVal);
         if (res == EmGetValueResult::failed) {
@@ -700,7 +808,7 @@ public:
      : EmNexDecimal<tPage>(intElementName, logLevel),
        EmValue<double>() {}
 
-    virtual bool setValue(double const value) override {
+    virtual bool setValue(const double& value) override {
         return EmNexDecimal<tPage>::setValue(value);
     }
 
@@ -709,10 +817,48 @@ public:
     }
 };
 
+// Use 'EmNexDecimalTag' class if you need an 'EmTagValue' object 
+template<EmNexPage& tPage>
+class EmNexDecimalTag: public EmNexDecimal<tPage>,
+                      public EmTagInterface
+{
+public:
+    EmNexDecimalTag(const char* intElementName,
+                   const char* decElementName,
+                   uint8_t decPlaces,
+                   EmSyncFlags flags,
+                   EmLogLevel logLevel=EmLogLevel::none)
+     : EmNexDecimal<tPage>(intElementName, decElementName, decPlaces, logLevel),
+       EmTagInterface(flags) {}
+    
+    virtual const char* getId() const override {
+        return this->m_name;
+    }
 
-// TODO: handle uninitialized elements on startup (i.e. alternatives to 'dispInitialValue' parameter)
-//       This should be done in case the display powers off an on while controlle is still running.
-//       If this happens configuration values need to be re-initialized to the display.
+    virtual EmTagValue getValue() const {
+        EmTagValue val(EmTagValueType::vt_real);
+        this->getValue(val);    
+        return val;
+    }
+
+    virtual EmGetValueResult getValue(EmTagValue& value) const override {
+        double val;
+        EmGetValueResult res = EmNexDecimal<tPage>::getValue(val);
+        if (EmGetValueResult::failed != res) {
+            value.setValue(val, true);
+        }
+        return res;
+    }
+
+    virtual bool setValue(const EmTagValue& value) override {
+        if (value.getType() != EmTagValueType::vt_real) {
+            return false;
+        }
+        EmTagValueStruct out;
+        value.toStruct(out);
+        return EmNexDecimal<tPage>::setValue(out.m_value.as_real);
+    }
+};
 
 
 // Configuration element for integer values
@@ -720,6 +866,10 @@ public:
 // This class is used to handle configuration elements on the Nextion display.
 // A configuration element should be initialized first (i.e. value sent to the display element)
 // before reading it.
+//
+// TODO: handle uninitialized elements on startup (i.e. alternatives to 'dispInitialValue' parameter)
+//       This should be done in case the display powers off an on while controlle is still running.
+//       If this happens configuration values need to be re-initialized to the display.
 template<EmNexPage& tPage>
 class EmNexCfgInteger: public EmNexInteger<tPage> {
 public: 
