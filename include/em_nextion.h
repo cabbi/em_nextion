@@ -457,9 +457,9 @@ public:
 
     virtual EmGetValueResult getValue(char* value) const override {
         // NOTE:
-        //  Since 'GetValue' overrides a virtual method it can not 
+        //  Since 'getValue' overrides a virtual method it can not 
         //  be template based. 100 should be a good compromise.
-        //  To use exact len please use the templated 'getValue' method. 
+        //  To use exact len please use the templated non virtual 'getValue' method. 
         return EmNexText<tPage>::getValue<100>(value);
     }
 
@@ -484,13 +484,29 @@ public:
         return this->m_name;
     }
 
-    virtual EmGetValueResult getValue(EmTagValue& value) const {
-
+    virtual EmGetValueResult getValue(EmTagValue& value) const override {
+        // NOTE:
+        //  Since 'getValue' overrides a virtual method it can not 
+        //  be template based. 100 should be a good compromise.
+        //  To use exact len please use the templated non virtual 'getValue' method. 
+        const char* val[101];
+        EmGetValueResult res = EmNexText<tPage>::getValue<100>(val);
+        if (EmGetValueResult::failed != res) {
+            if (!value.setValue(val, true)) {
+                return EmGetValueResult::failed;
+            }
+        }
+        return res;
     }
 
-    virtual bool setValue(EmTagValue& value) override {
-    }
-};
+    virtual bool setValue(const EmTagValue& value) override {
+        if (value.getType() != EmTagValueType::vt_string) {
+            return false;
+        }
+        EmTagValueStruct out;
+        value.toStruct(out);
+        return EmNexText<tPage>::setValue(out.m_value.as_string->c_str());
+    }};
 
 template<EmNexPage& tPage>
 class EmNexInteger: public EmNexColoredElement<tPage>
@@ -570,7 +586,9 @@ public:
         int32_t val;
         EmGetValueResult res = EmNexInteger<tPage>::getValue(val);
         if (EmGetValueResult::failed != res) {
-            value.setValue(val, true);
+            if (!value.setValue(val, true)) {
+                return EmGetValueResult::failed;
+            }
         }
         return res;
     }
@@ -675,7 +693,9 @@ public:
         double val;
         EmGetValueResult res = EmNexReal<tPage>::getValue(val);
         if (EmGetValueResult::failed != res) {
-            value.setValue(val, true);
+            if (!value.setValue(val, true)) {
+                return EmGetValueResult::failed;
+            }
         }
         return res;
     }
