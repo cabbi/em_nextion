@@ -471,14 +471,14 @@ public:
 // Use 'EmNexTextTag' class if you need an 'EmTagValue' object 
 template<EmNexPage& tPage>
 class EmNexTextTag: public EmNexText<tPage>,
-                    public EmTagInterface
+                    public EmTagBase
 {
 public:
      EmNexTextTag(const char* name,
                   EmSyncFlags flags,
                   EmLogLevel logLevel=EmLogLevel::none)
      : EmNexText<tPage>(name, logLevel), 
-       EmTagInterface(flags) {}
+       EmTagBase(flags) {}
 
     virtual const char* getId() const override {
         return this->m_name;
@@ -563,14 +563,14 @@ public:
 // Use 'EmNexIntegerTag' class if you need an 'EmTagValue' object 
 template<EmNexPage& tPage>
 class EmNexIntegerTag: public EmNexInteger<tPage>,
-                       public EmTagInterface
+                       public EmTagBase
 {
 public:
     EmNexIntegerTag(const char* name,
                     EmSyncFlags flags,
                     EmLogLevel logLevel=EmLogLevel::none)
      : EmNexInteger<tPage>(name, logLevel),
-       EmTagInterface(flags) {}
+       EmTagBase(flags) {}
     
     virtual const char* getId() const override {
         return this->m_name;
@@ -669,7 +669,7 @@ public:
 // Use 'EmNexRealTag' class if you need an 'EmTagValue' object 
 template<EmNexPage& tPage>
 class EmNexRealTag: public EmNexReal<tPage>,
-                    public EmTagInterface
+                    public EmTagBase
 {
 public:
     EmNexRealTag(const char* name,
@@ -677,7 +677,7 @@ public:
                  EmSyncFlags flags,
                  EmLogLevel logLevel=EmLogLevel::none)
      : EmNexReal<tPage>(name, decPlaces, logLevel),
-       EmTagInterface(flags) {}
+       EmTagBase(flags) {}
     
     virtual const char* getId() const override {
         return this->m_name;
@@ -840,7 +840,7 @@ public:
 // Use 'EmNexDecimalTag' class if you need an 'EmTagValue' object 
 template<EmNexPage& tPage>
 class EmNexDecimalTag: public EmNexDecimal<tPage>,
-                      public EmTagInterface
+                      public EmTagBase
 {
 public:
     EmNexDecimalTag(const char* intElementName,
@@ -849,7 +849,7 @@ public:
                    EmSyncFlags flags,
                    EmLogLevel logLevel=EmLogLevel::none)
      : EmNexDecimal<tPage>(intElementName, decElementName, decPlaces, logLevel),
-       EmTagInterface(flags) {}
+       EmTagBase(flags) {}
     
     virtual const char* getId() const override {
         return this->m_name;
@@ -890,10 +890,10 @@ public:
 // TODO: handle uninitialized elements on startup (i.e. alternatives to 'dispInitialValue' parameter)
 //       This should be done in case the display powers off an on while controlle is still running.
 //       If this happens configuration values need to be re-initialized to the display.
-template<EmNexPage& tPage>
-class EmNexCfgInteger: public EmNexInteger<tPage> {
+template<typename T, EmNexPage& tPage>
+class EmNexCfgValue: public EmNexInteger<tPage> {
 public: 
-    EmNexCfgInteger(const char* name)
+    EmNexCfgValue(const char* name)
      : EmNexInteger<tPage>(name),
        m_isInitialized(false) {}
 
@@ -906,10 +906,10 @@ public:
     //  (i.e. if display value is greater than maxValue, maxValue is assigned to 'value').
     // 'dispInitialValue' is the optional initial value of the display element on power on
     //  (i.e. if the display value is equal to 'dispInitialValue' then this element is considered uninitialized).
-    bool updateValue(EmValue<int16_t>& value, 
-                     EmOptional<int16_t> minValue = emUndefined,
-                     EmOptional<int16_t> maxValue = emUndefined,
-                     EmOptional<int16_t> dispInitialValue = emUndefined) {
+    virtual bool updateValue(EmValue<T>& value, 
+                             EmOptional<T> minValue = emUndefined,
+                             EmOptional<T> maxValue = emUndefined,
+                             EmOptional<T> dispInitialValue = emUndefined) {
         // Set or get value ONLY if not on that page!
         if (tPage.isCurrent()) {
             return false;
@@ -917,8 +917,8 @@ public:
         // Value already set the first time?
         if (m_isInitialized) {
             // Get value from display
-            int16_t dispValue = 0;
-            if (EmGetValueResult::failed != EmNexInteger<tPage>::getValue(dispValue)) {
+            T dispValue;
+            if (getValue_(dispValue)) {
                 if (dispInitialValue.hasValue() && dispInitialValue.value() == dispValue) {
                     // Somehow variable got reset (display power off?)
                     m_isInitialized = false;
@@ -935,9 +935,9 @@ public:
         }
         // Need to set the value?
         if (!isInitialized()) {
-            int16_t dispValue = 0;
+            T dispValue = T();
             if (EmGetValueResult::failed != value.getValue(dispValue)) {
-                m_isInitialized = EmNexInteger<tPage>::setValue(dispValue);
+                m_isInitialized = setValue_(dispValue);
             }
             return m_isInitialized;
         } 
@@ -945,17 +945,62 @@ public:
     }
 
     // True if the element is initialized (i.e. display value has been set on startup)
-    bool isInitialized() const {
+    virtual bool isInitialized() const {
         return m_isInitialized;
     }
 
     // Resets the element to its uninitialized state
-    void reset() {
+    virtual void reset() {
         m_isInitialized = false;
     }
 
-private:
+protected:
+    virtual bool getValue_(int16_t& value) {
+        return EmNexInteger<tPage>::getValue(value) != EmGetValueResult::failed;
+    }
+
+    virtual bool getValue_(int32_t& value) {
+        return EmNexInteger<tPage>::getValue(value) != EmGetValueResult::failed;
+    }
+
+    virtual bool getValue_(EmTagValue& value) {
+        EmTagValueStruct out;
+        value.toStruct(out);
+        if (out.m_type != EmTagValueType::vt_integer) {
+            return false;
+        }
+        return EmNexInteger<tPage>::getValue(out.m_value.as_integer) != EmGetValueResult::failed;
+    }
+
+    virtual bool setValue_(int32_t value) {
+        return EmNexInteger<tPage>::setValue(value);
+    }
+
+    virtual bool setValue_(EmTagValue value) {
+        EmTagValueStruct out;
+        value.toStruct(out);
+        if (out.m_type != EmTagValueType::vt_integer) {
+            return false;
+        }
+        return EmNexInteger<tPage>::setValue(out.m_value.as_integer);
+    }
+
     bool m_isInitialized;   
+};
+
+template<typename intT, EmNexPage& tPage>
+class EmNexCfgInteger: public EmNexCfgValue<intT, tPage> {
+public:
+    EmNexCfgInteger(const char* name)
+     : EmNexCfgValue<intT, tPage>(name) {}
+};
+
+// NOTE: EmTagValue must be of type EmTagValueType::vt_integer
+template<EmNexPage& tPage>
+class EmNexCfgTag: public EmNexCfgValue<EmTagValue, tPage> {
+public:
+    EmNexCfgTag(const char* name)
+     : EmNexCfgValue<EmTagValue, tPage>(name) {}
 };
 
 template<size_t len>
