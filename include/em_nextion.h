@@ -470,15 +470,14 @@ public:
 
 // Use 'EmNexTextTag' class if you need an 'EmTagValue' object 
 template<EmNexPage& tPage>
-class EmNexTextTag: public EmNexText<tPage>,
-                    public EmTagBase
-{
+class EmNexTextTag: public EmTagBase,
+                    public EmNexText<tPage> {   
 public:
      EmNexTextTag(const char* name,
                   EmSyncFlags flags,
                   EmLogLevel logLevel=EmLogLevel::none)
-     : EmNexText<tPage>(name, logLevel), 
-       EmTagBase(flags) {}
+     : EmTagBase(flags),
+       EmNexText<tPage>(name, logLevel) {} 
 
     virtual const char* getId() const override {
         return this->m_name;
@@ -562,15 +561,14 @@ public:
 
 // Use 'EmNexIntegerTag' class if you need an 'EmTagValue' object 
 template<EmNexPage& tPage>
-class EmNexIntegerTag: public EmNexInteger<tPage>,
-                       public EmTagBase
-{
+class EmNexIntegerTag: public EmTagBase,
+                       public EmNexInteger<tPage> {
 public:
     EmNexIntegerTag(const char* name,
                     EmSyncFlags flags,
                     EmLogLevel logLevel=EmLogLevel::none)
-     : EmNexInteger<tPage>(name, logLevel),
-       EmTagBase(flags) {}
+     : EmTagBase(flags),
+       EmNexInteger<tPage>(name, logLevel) {}
     
     virtual const char* getId() const override {
         return this->m_name;
@@ -668,16 +666,15 @@ public:
 
 // Use 'EmNexRealTag' class if you need an 'EmTagValue' object 
 template<EmNexPage& tPage>
-class EmNexRealTag: public EmNexReal<tPage>,
-                    public EmTagBase
-{
+class EmNexRealTag: public EmTagBase,
+                    public EmNexReal<tPage>{
 public:
     EmNexRealTag(const char* name,
                  uint8_t decPlaces,
                  EmSyncFlags flags,
                  EmLogLevel logLevel=EmLogLevel::none)
-     : EmNexReal<tPage>(name, decPlaces, logLevel),
-       EmTagBase(flags) {}
+     : EmTagBase(flags),
+       EmNexReal<tPage>(name, decPlaces, logLevel) {}
     
     virtual const char* getId() const override {
         return this->m_name;
@@ -839,17 +836,16 @@ public:
 
 // Use 'EmNexDecimalTag' class if you need an 'EmTagValue' object 
 template<EmNexPage& tPage>
-class EmNexDecimalTag: public EmNexDecimal<tPage>,
-                      public EmTagBase
-{
+class EmNexDecimalTag: public EmTagBase,
+                       public EmNexDecimal<tPage> {
 public:
     EmNexDecimalTag(const char* intElementName,
                    const char* decElementName,
                    uint8_t decPlaces,
                    EmSyncFlags flags,
                    EmLogLevel logLevel=EmLogLevel::none)
-     : EmNexDecimal<tPage>(intElementName, decElementName, decPlaces, logLevel),
-       EmTagBase(flags) {}
+     : EmTagBase(flags),
+       EmNexDecimal<tPage>(intElementName, decElementName, decPlaces, logLevel) {}
     
     virtual const char* getId() const override {
         return this->m_name;
