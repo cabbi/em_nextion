@@ -75,10 +75,25 @@ public:
     EmGetValueResult getNumElementValue(const char* pageName, 
                                         const char* elementName, 
                                         int32_t& val) const;
+
     template<size_t len>
     EmGetValueResult getTextElementValue(const char* pageName, 
                                          const char* elementName, 
-                                         char* txt) const;
+                                         char* txt) const {
+        // Create a copy in case communication fails
+        // (i.e. some bytes might be modified by _recv method!)
+        char dispTxt[len+1];
+        strncpy(dispTxt, txt, len);
+        EmGetValueResult res = EmGetValueResult::failed;
+        if (sendGetCmd_(pageName, elementName, "txt")) {
+            res = getString_(dispTxt, sizeof(dispTxt), elementName);    
+        }
+        // Copy the received text int user value
+        if (EmGetValueResult::failed != res) {
+            strcpy(txt, dispTxt);
+        }
+        return res;
+    }
 
     bool setNumElementValue(const char* pageName, 
                             const char* elementName, 
@@ -499,12 +514,10 @@ public:
     }
 
     virtual bool setValue(const EmTagValue& value) override {
-        if (value.getType() != EmTagValueType::vt_string) {
+        if (value.isNotType(EmTagValueType::vt_string)) {
             return false;
         }
-        EmTagValueStruct out;
-        value.toStruct(out);
-        return EmNexText<tPage>::setValue(out.m_value.as_string->c_str());
+        return EmNexText<tPage>::setValue(value.asString());
     }};
 
 template<EmNexPage& tPage>
@@ -516,12 +529,12 @@ public:
      : EmNexColoredElement<tPage>(name, logLevel) {}
 
     // Templated methods (not virtual)
-    template <class int_type>
-    EmGetValueResult getValue(int_type& value) const {
+    template <class T>
+    EmGetValueResult getValue(T& value) const {
         int32_t val = static_cast<int32_t>(value);
         EmGetValueResult res = getValue(val);
         if (EmGetValueResult::failed != res) {
-            value = static_cast<int_type>(val);
+            value = static_cast<T>(val);
         }
         return res;
     }
@@ -592,12 +605,10 @@ public:
     }
 
     virtual bool setValue(const EmTagValue& value) override {
-        if (value.getType() != EmTagValueType::vt_integer) {
+        if (value.isNotType(EmTagValueType::vt_integer)) {
             return false;
         }
-        EmTagValueStruct out;
-        value.toStruct(out);
-        return EmNexInteger<tPage>::setValue(out.m_value.as_integer);
+        return EmNexInteger<tPage>::setValue(value.asInteger());
     }
 };
 
@@ -698,12 +709,10 @@ public:
     }
 
     virtual bool setValue(const EmTagValue& value) override {
-        if (value.getType() != EmTagValueType::vt_real) {
+        if (value.isNotType(EmTagValueType::vt_real)) {
             return false;
         }
-        EmTagValueStruct out;
-        value.toStruct(out);
-        return EmNexReal<tPage>::setValue(out.m_value.as_real);
+        return EmNexReal<tPage>::setValue(value.asReal());
     }
 };
 
@@ -867,12 +876,10 @@ public:
     }
 
     virtual bool setValue(const EmTagValue& value) override {
-        if (value.getType() != EmTagValueType::vt_real) {
+        if (value.isNotType(EmTagValueType::vt_real)) {
             return false;
         }
-        EmTagValueStruct out;
-        value.toStruct(out);
-        return EmNexDecimal<tPage>::setValue(out.m_value.as_real);
+        return EmNexDecimal<tPage>::setValue(value.asReal());
     }
 };
 
@@ -884,12 +891,12 @@ public:
 // before reading it.
 //
 // TODO: handle uninitialized elements on startup (i.e. alternatives to 'dispInitialValue' parameter)
-//       This should be done in case the display powers off an on while controlle is still running.
+//       This should be done in case the display powers off an on while controller is still running.
 //       If this happens configuration values need to be re-initialized to the display.
-template<typename T, EmNexPage& tPage>
-class EmNexCfgValue: public EmNexInteger<tPage> {
+template<EmNexPage& tPage>
+class EmNexCfgInteger: public EmNexInteger<tPage> {
 public: 
-    EmNexCfgValue(const char* name)
+    EmNexCfgInteger(const char* name)
      : EmNexInteger<tPage>(name),
        m_isInitialized(false) {}
 
@@ -902,10 +909,11 @@ public:
     //  (i.e. if display value is greater than maxValue, maxValue is assigned to 'value').
     // 'dispInitialValue' is the optional initial value of the display element on power on
     //  (i.e. if the display value is equal to 'dispInitialValue' then this element is considered uninitialized).
-    virtual bool updateValue(EmValue<T>& value, 
-                             EmOptional<T> minValue = emUndefined,
-                             EmOptional<T> maxValue = emUndefined,
-                             EmOptional<T> dispInitialValue = emUndefined) {
+    template<typename T, typename V>
+    bool updateValue(EmValue<T>& value, 
+                     EmOptional<V> minValue = emUndefined,
+                     EmOptional<V> maxValue = emUndefined,
+                     EmOptional<V> dispInitialValue = emUndefined) {
         // Set or get value ONLY if not on that page!
         if (tPage.isCurrent()) {
             return false;
@@ -915,7 +923,7 @@ public:
             // Get value from display
             T dispValue;
             if (getValue_(dispValue)) {
-                if (dispInitialValue.hasValue() && dispInitialValue.value() == dispValue) {
+                if (dispInitialValue.hasValue() && dispValue == dispInitialValue.value()) {
                     // Somehow variable got reset (display power off?)
                     m_isInitialized = false;
                 } else {
@@ -960,12 +968,15 @@ protected:
     }
 
     virtual bool getValue_(EmTagValue& value) {
-        EmTagValueStruct out;
-        value.toStruct(out);
-        if (out.m_type != EmTagValueType::vt_integer) {
+        if (value.isNotType(EmTagValueType::vt_integer)) {
             return false;
         }
-        return EmNexInteger<tPage>::getValue(out.m_value.as_integer) != EmGetValueResult::failed;
+        int32_t dispValue = value.asInteger();
+        EmGetValueResult res = EmNexInteger<tPage>::getValue(dispValue);
+        if (EmGetValueResult::succeedNotEqualValue == res) {
+            return value.setValue(dispValue, false);
+        }
+        return EmGetValueResult::failed != res;
     }
 
     virtual bool setValue_(int32_t value) {
@@ -973,51 +984,13 @@ protected:
     }
 
     virtual bool setValue_(EmTagValue value) {
-        EmTagValueStruct out;
-        value.toStruct(out);
-        if (out.m_type != EmTagValueType::vt_integer) {
+        if (value.isNotType(EmTagValueType::vt_integer)) {
             return false;
         }
-        return EmNexInteger<tPage>::setValue(out.m_value.as_integer);
+        return EmNexInteger<tPage>::setValue(value.asInteger());
     }
 
     bool m_isInitialized;   
 };
-
-template<typename intT, EmNexPage& tPage>
-class EmNexCfgInteger: public EmNexCfgValue<intT, tPage> {
-public:
-    EmNexCfgInteger(const char* name)
-     : EmNexCfgValue<intT, tPage>(name) {}
-};
-
-// NOTE: EmTagValue must be of type EmTagValueType::vt_integer
-template<EmNexPage& tPage>
-class EmNexCfgTag: public EmNexCfgValue<EmTagValue, tPage> {
-public:
-    EmNexCfgTag(const char* name)
-     : EmNexCfgValue<EmTagValue, tPage>(name) {}
-};
-
-template<size_t len>
-inline EmGetValueResult EmNextion::getTextElementValue(
-    const char* pageName, 
-    const char* elementName, 
-    char* txt) const
-{
-    // Create a copy in case communication fails
-    // (i.e. some bytes might be modified by _recv method!)
-    char dispTxt[len+1];
-    strncpy(dispTxt, txt, len);
-    EmGetValueResult res = EmGetValueResult::failed;
-    if (sendGetCmd_(pageName, elementName, "txt")) {
-        res = getString_(dispTxt, sizeof(dispTxt), elementName);    
-    }
-    // Copy the received text int user value
-    if (EmGetValueResult::failed != res) {
-        strcpy(txt, dispTxt);
-    }
-    return res;
-}
 
 #endif // __EM_NEXTION__
