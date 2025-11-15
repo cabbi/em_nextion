@@ -59,7 +59,7 @@ class EmNextion: public EmLog {
 public:
     EmNextion(EmComSerial& serial, 
               uint32_t timeoutMs, 
-              EmLogLevel logLevel=EmLogLevel::none);
+              EmLogLevel logLevel=EmLogLevel::global);
 
     bool begin() const;
 
@@ -351,12 +351,12 @@ public:
 
     // Set element picture (only for picture objects).
     bool setPicture(uint8_t picId) const {
-        return this->nex().SetPicture(tPage.name(), this->m_name, picId);
+        return this->nex().setPicture(tPage.name(), this->m_name, picId);
     }
 
     // Get element picture (only for picture objects).
     bool getPicture(uint8_t& picId) const {
-        return this->nex().GetPicture(tPage.name(), this->m_name, picId);
+        return this->nex().getPicture(tPage.name(), this->m_name, picId);
     }
 };
 
@@ -488,11 +488,19 @@ template<EmNexPage& tPage>
 class EmNexTextTag: public EmTagBase,
                     public EmNexText<tPage> {   
 public:
-     EmNexTextTag(const char* name,
-                  EmSyncFlags flags,
-                  EmLogLevel logLevel=EmLogLevel::none)
+    EmNexTextTag(const char* name,
+                 EmSyncFlags flags,
+                 EmLogLevel logLevel=EmLogLevel::none)
      : EmTagBase(flags),
        EmNexText<tPage>(name, logLevel) {} 
+    
+    EmNexTextTag(const char* name,
+                 EmSyncFlags flags,
+                 EmTags& tags,
+                 EmLogLevel logLevel=EmLogLevel::none)
+     : EmNexTextTag<tPage>(name, flags, logLevel) {
+        tags.add(*this);
+    }    
 
     virtual const char* getId() const override {
         return this->m_name;
@@ -582,6 +590,14 @@ public:
                     EmLogLevel logLevel=EmLogLevel::none)
      : EmTagBase(flags),
        EmNexInteger<tPage>(name, logLevel) {}
+    
+    EmNexIntegerTag(const char* name,
+                    EmSyncFlags flags,
+                    EmTags& tags,
+                    EmLogLevel logLevel=EmLogLevel::none)
+     : EmNexIntegerTag<tPage>(name, flags, logLevel) {
+        tags.add(*this);
+     }
     
     virtual const char* getId() const override {
         return this->m_name;
@@ -686,6 +702,15 @@ public:
                  EmLogLevel logLevel=EmLogLevel::none)
      : EmTagBase(flags),
        EmNexReal<tPage>(name, decPlaces, logLevel) {}
+    
+    EmNexRealTag(const char* name,
+                 uint8_t decPlaces,
+                 EmSyncFlags flags,
+                 EmTags& tags,
+                 EmLogLevel logLevel=EmLogLevel::none)
+     : EmNexRealTag<tPage>(name, decPlaces, flags, logLevel) {
+        tags.add(*this);
+     }
     
     virtual const char* getId() const override {
         return this->m_name;
@@ -849,12 +874,22 @@ class EmNexDecimalTag: public EmTagBase,
                        public EmNexDecimal<tPage> {
 public:
     EmNexDecimalTag(const char* intElementName,
-                   const char* decElementName,
-                   uint8_t decPlaces,
-                   EmSyncFlags flags,
-                   EmLogLevel logLevel=EmLogLevel::none)
+                    const char* decElementName,
+                    uint8_t decPlaces,
+                    EmSyncFlags flags,
+                    EmLogLevel logLevel=EmLogLevel::none)
      : EmTagBase(flags),
        EmNexDecimal<tPage>(intElementName, decElementName, decPlaces, logLevel) {}
+    
+    EmNexDecimalTag(const char* intElementName,
+                    const char* decElementName,
+                    uint8_t decPlaces,
+                    EmSyncFlags flags,
+                    EmTags& tags,
+                    EmLogLevel logLevel=EmLogLevel::none)
+     : EmNexDecimalTag<tPage>(intElementName, decElementName, decPlaces, flags, logLevel) {
+        tags.add(*this);
+     }
     
     virtual const char* getId() const override {
         return this->m_name;
