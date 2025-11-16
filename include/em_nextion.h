@@ -59,6 +59,12 @@ class EmNextion: public EmLog {
 public:
     EmNextion(EmComSerial& serial, 
               uint32_t timeoutMs, 
+              EmLogLevel logLevel=EmLogLevel::global) :
+        EmNextion(serial, timeoutMs, NULL, logLevel) {}
+
+    EmNextion(EmComSerial& serial, 
+              uint32_t timeoutMs, 
+              const char* logContext,
               EmLogLevel logLevel=EmLogLevel::global);
 
     bool begin() const;

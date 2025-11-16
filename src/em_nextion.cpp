@@ -8,8 +8,9 @@
 // NOTE: program MUST set "bauds" at first page initialization)
 EmNextion::EmNextion(EmComSerial& serial, 
                      uint32_t timeoutMs, 
+                     const char* logContext,
                      EmLogLevel logLevel)
- : EmLog("Nex", logLevel),
+ : EmLog(logContext, logLevel),
    m_serial(serial),
    m_timeoutMs(timeoutMs),
    m_isInit(false)
@@ -111,7 +112,7 @@ EmGetValueResult EmNextion::recv_(uint8_t ackCode,
             }
         }
     }
-    logDebug<50>("RX: %s [Timeout elapsed!]", buf);
+    logDebug<60>("Received %d of %d bytes [Timeout elapsed!]", buf_pos, len);
     return result_(false, value_changed);
 }
 
