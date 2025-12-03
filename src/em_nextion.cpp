@@ -5,19 +5,13 @@
 #include "em_defs.h"
 
 
-// NOTE: program MUST set "bauds" at first page initialization)
-EmNextion::EmNextion(EmComSerial& serial, 
-                     uint32_t timeoutMs, 
-                     const char* logContext,
-                     EmLogLevel logLevel)
- : EmLog(logContext, logLevel),
-   m_serial(serial),
-   m_timeoutMs(timeoutMs),
-   m_isInit(false)
+bool EmNextion::begin(unsigned long baud) const
 {
+    m_serial.begin(baud);
+    return begin_();
 }
 
-bool EmNextion::begin() const
+bool EmNextion::begin_() const
 {
     // Have command feedback on both success/fail  
     sendCmdParam_("bkcmd=3");
@@ -29,7 +23,7 @@ bool EmNextion::begin() const
 bool EmNextion::sendCmd_(const char* firstCmd, ...) const
 {
     // Before sending let's see if display is active/connected
-    if (!m_isInit && !begin()) {
+    if (!m_isInit && !begin_()) {
         return false;
     }
     m_serial.flush();

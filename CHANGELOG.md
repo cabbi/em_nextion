@@ -30,4 +30,5 @@
 
 # 2.1.0
 - Added 'EmNexIntegerTag', 'EmNexRealTag' and 'EmNexDecimalTag' to support a persistent value in the 'EmTags' class
+- New 'EmSerialStream' class to handle serial stream directly in the nextion object (NOTE: this change break backwards compatibility!)
 - Typo fixes
