@@ -15,7 +15,7 @@ public:
     virtual ~EmNexTagBase() = default;
 
     virtual const char* getId() const {
-        return EmNexTagBase::name();
+        return nexElement::name();
     }
 
     virtual EmGetValueResult getValue(EmTagValue& value) const {
@@ -70,6 +70,16 @@ public:
     }
 };
 
+// This class provides 'EmNexTextTag' plus an 'onSetValue' callback.
+template<EmNexPage& tPage,
+         size_t max_str_len,
+         EmOnSetValueCallbackType<EmTagValue> OnSetValue>
+class EmNexTextTagEx: public EmValueEx<EmNexTextTag<tPage, max_str_len>, EmTagValue, OnSetValue> {
+public:
+public:
+    using EmValueEx<EmNexTextTag<tPage, max_str_len>, EmTagValue, OnSetValue>::EmValueEx;
+};
+
 
 // An integer tag displayed on an 'Number' nextion object.
 template<EmNexPage& tPage>
@@ -103,6 +113,17 @@ public:
     }
 };
 
+
+// This class provides 'EmNexIntegerTag' plus an 'onSetValue' callback.
+template<EmNexPage& tPage,
+         EmOnSetValueCallbackType<EmTagValue> OnSetValue>
+class EmNexIntegerTagEx: public EmValueEx<EmNexIntegerTag<tPage>, EmTagValue, OnSetValue> {
+public:
+public:
+    using EmValueEx<EmNexIntegerTag<tPage>, EmTagValue, OnSetValue>::EmValueEx;
+};
+
+
 // An real tag displayed on an 'Xfloat' nextion object.
 template<EmNexPage& tPage>
 class EmNexRealTag: public EmNexTagBase<EmNexReal<tPage>, double>,
@@ -135,6 +156,16 @@ public:
     virtual bool setValue(const EmTagValue& value) override {
         return EmNexTagBase<EmNexReal<tPage>, double>::setValue(value);
     }
+};
+
+
+// This class provides 'EmNexRealTag' plus an 'onSetValue' callback.
+template<EmNexPage& tPage,
+         EmOnSetValueCallbackType<EmTagValue> OnSetValue>
+class EmNexRealTagEx: public EmValueEx<EmNexRealTag<tPage>, EmTagValue, OnSetValue> {
+public:
+public:
+    using EmValueEx<EmNexRealTag<tPage>, EmTagValue, OnSetValue>::EmValueEx;
 };
 
 
@@ -176,6 +207,17 @@ public:
     }
 };
 
+
+// This class provides 'EmNexDecimalTag' plus an 'onSetValue' callback.
+template<EmNexPage& tPage,
+         EmOnSetValueCallbackType<EmTagValue> OnSetValue>
+class EmNexDecimalTagEx: public EmValueEx<EmNexDecimalTag<tPage>, EmTagValue, OnSetValue> {
+public:
+public:
+    using EmValueEx<EmNexDecimalTag<tPage>, EmTagValue, OnSetValue>::EmValueEx;
+};
+
+
 // Configuration element for integer tag values
 template<EmNexPage& tPage>
 class EmNexCfgIntegerTag: public EmNexTagBase<EmNexCfgInteger<tPage>, int32_t>,
@@ -191,7 +233,7 @@ public:
                        EmSyncFlags syncFlags,
                        EmTags& tags,
                        EmLogLevel logLevel=EmLogLevel::global)
-     : EmNexCfgIntegerTag<tPage>(name, logLevel) {
+     : EmNexCfgIntegerTag<tPage>(name, syncFlags, logLevel) {
         tags.add(*this);
     }
 
@@ -206,6 +248,22 @@ public:
     virtual bool setValue(const EmTagValue& value) override {
         return EmNexTagBase<EmNexCfgInteger<tPage>, int32_t>::setValue(value);
     }
+
+    virtual bool updateValue(EmOptional<int32_t> minValue = emUndefined,
+                             EmOptional<int32_t> maxValue = emUndefined,
+                             EmOptional<int32_t> dispInitialValue = emUndefined) {
+        return EmNexTagBase<EmNexCfgInteger<tPage>, int32_t>::updateValue<EmTagValue, int32_t>(*this, minValue, maxValue, dispInitialValue);
+    }                                
+
+};
+
+// This class provides 'EmNexCfgIntegerTag' plus an 'onSetValue' callback.
+template<EmNexPage& tPage,
+         EmOnSetValueCallbackType<EmTagValue> OnSetValue>
+class EmNexCfgIntegerTagEx: public EmValueEx<EmNexCfgIntegerTag<tPage>, EmTagValue, OnSetValue> {
+public:
+public:
+    using EmValueEx<EmNexCfgIntegerTag<tPage>, EmTagValue, OnSetValue>::EmValueEx;
 };
 
 #endif // __EM_NEXTION_EX__

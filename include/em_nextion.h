@@ -10,8 +10,8 @@
 #include "em_value_sync.h"
 
 // NOTE:
-// The following classes have no virtual methods. This is to reduce the RAM footprint of each object instance.
-// To use more flexible and "extendable" classes please refer to the 'em_nextion_ex.h" classes.
+// The following classes have no virtual methods. 
+// This is to reduce the RAM footprint of each object instance.
 
 // Nextion defined result codes
 enum EmNextionRet: uint8_t {
@@ -278,15 +278,13 @@ public:
     #endif
     {}
 
-#ifdef EM_NO_LOG
     const char* name() const {
+        #ifdef EM_NO_LOG
         return m_name;
-    };
-#else
-    const char* name() const {
+        #else
         return getContext();
+        #endif
     };
-#endif
 
 protected:
 #ifdef EM_NO_LOG
@@ -331,6 +329,7 @@ protected:
 // A general page UI element.
 //
 // This is the base class for many following objects, each belonging to a nextion page.
+// Page templete is to reduce RAM footprint.
 template<EmNexPage& tPage>
 class EmNexPageElement: public EmNexObject
 {
@@ -395,7 +394,7 @@ public:
 
 // A general colored item. 
 //
-// This is the base class for many other nextion objects having the font and background color properties.
+// This is the base class for many other nextion objects having font and background color properties.
 template<EmNexPage& tPage>
 class EmNexColoredElement: public EmNexPageElement<tPage>
 {
@@ -467,7 +466,7 @@ public:
 
 };
 
-// A text displayed on an 'Text' nextion object
+// A text displayed on an 'Text' nextion object.
 template<EmNexPage& tPage>
 class EmNexText: public EmNexColoredElement<tPage>
 {
@@ -497,7 +496,7 @@ public:
 };
 
 
-// An integer number displayed on an 'Number' nextion object
+// An integer number displayed on an 'Number' nextion object.
 template<EmNexPage& tPage>
 class EmNexInteger: public EmNexColoredElement<tPage>
 {
@@ -531,7 +530,7 @@ public:
 };
 
 
-// A floating point number displayed on a 'Xfloat' nextion object
+// A floating point number displayed on a 'Xfloat' nextion object.
 template<EmNexPage& tPage>
 class EmNexReal: public EmNexColoredElement<tPage>
 {
@@ -683,7 +682,7 @@ protected:
 };
 
 
-// Configuration element for integer values
+// Configuration element for integer values.
 //
 // This class is used to handle configuration elements on the Nextion display.
 // A configuration element should be initialized first (i.e. value sent to the display element)
@@ -768,10 +767,7 @@ protected:
     }
 
     bool getValue_(EmTagValue& value) {
-        if (value.isNotType(EmTagValueType::vt_integer)) {
-            return false;
-        }
-        int32_t dispValue = value.asInteger();
+        int32_t dispValue = value.isType(EmTagValueType::vt_integer) ? value.asInteger() : 0;
         EmGetValueResult res = EmNexInteger<tPage>::getValue(dispValue);
         if (EmGetValueResult::succeedNotEqualValue == res) {
             return value.setValue(dispValue, false);
