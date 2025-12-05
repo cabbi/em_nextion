@@ -73,11 +73,12 @@ public:
 // This class provides 'EmNexTextTag' plus an 'onSetValue' callback.
 template<EmNexPage& tPage,
          size_t max_str_len,
-         EmOnSetValueCallbackType<EmTagValue> OnSetValue>
-class EmNexTextTagEx: public EmValueEx<EmNexTextTag<tPage, max_str_len>, EmTagValue, OnSetValue> {
+         class SelfT,
+         EmOnSetValueCallbackType<SelfT, EmTagValue> OnSetValue>
+class EmNexTextTagEx: public EmValueEx<EmNexTextTag<tPage, max_str_len>, SelfT, EmTagValue, OnSetValue> {
 public:
 public:
-    using EmValueEx<EmNexTextTag<tPage, max_str_len>, EmTagValue, OnSetValue>::EmValueEx;
+    using EmValueEx<EmNexTextTag<tPage, max_str_len>, SelfT, EmTagValue, OnSetValue>::EmValueEx;
 };
 
 
@@ -116,11 +117,12 @@ public:
 
 // This class provides 'EmNexIntegerTag' plus an 'onSetValue' callback.
 template<EmNexPage& tPage,
-         EmOnSetValueCallbackType<EmTagValue> OnSetValue>
-class EmNexIntegerTagEx: public EmValueEx<EmNexIntegerTag<tPage>, EmTagValue, OnSetValue> {
+         class SelfT,
+         EmOnSetValueCallbackType<SelfT, EmTagValue> OnSetValue>
+class EmNexIntegerTagEx: public EmValueEx<EmNexIntegerTag<tPage>, SelfT, EmTagValue, OnSetValue> {
 public:
 public:
-    using EmValueEx<EmNexIntegerTag<tPage>, EmTagValue, OnSetValue>::EmValueEx;
+    using EmValueEx<EmNexIntegerTag<tPage>, SelfT, EmTagValue, OnSetValue>::EmValueEx;
 };
 
 
@@ -161,11 +163,12 @@ public:
 
 // This class provides 'EmNexRealTag' plus an 'onSetValue' callback.
 template<EmNexPage& tPage,
-         EmOnSetValueCallbackType<EmTagValue> OnSetValue>
-class EmNexRealTagEx: public EmValueEx<EmNexRealTag<tPage>, EmTagValue, OnSetValue> {
+         class SelfT,
+         EmOnSetValueCallbackType<SelfT, EmTagValue> OnSetValue>
+class EmNexRealTagEx: public EmValueEx<EmNexRealTag<tPage>, SelfT, EmTagValue, OnSetValue> {
 public:
 public:
-    using EmValueEx<EmNexRealTag<tPage>, EmTagValue, OnSetValue>::EmValueEx;
+    using EmValueEx<EmNexRealTag<tPage>, SelfT, EmTagValue, OnSetValue>::EmValueEx;
 };
 
 
@@ -210,11 +213,12 @@ public:
 
 // This class provides 'EmNexDecimalTag' plus an 'onSetValue' callback.
 template<EmNexPage& tPage,
-         EmOnSetValueCallbackType<EmTagValue> OnSetValue>
-class EmNexDecimalTagEx: public EmValueEx<EmNexDecimalTag<tPage>, EmTagValue, OnSetValue> {
+         class SelfT,
+         EmOnSetValueCallbackType<SelfT, EmTagValue> OnSetValue>
+class EmNexDecimalTagEx: public EmValueEx<EmNexDecimalTag<tPage>, SelfT, EmTagValue, OnSetValue> {
 public:
 public:
-    using EmValueEx<EmNexDecimalTag<tPage>, EmTagValue, OnSetValue>::EmValueEx;
+    using EmValueEx<EmNexDecimalTag<tPage>, SelfT, EmTagValue, OnSetValue>::EmValueEx;
 };
 
 
@@ -259,11 +263,12 @@ public:
 
 // This class provides 'EmNexCfgIntegerTag' plus an 'onSetValue' callback.
 template<EmNexPage& tPage,
-         EmOnSetValueCallbackType<EmTagValue> OnSetValue>
-class EmNexCfgIntegerTagEx: public EmValueEx<EmNexCfgIntegerTag<tPage>, EmTagValue, OnSetValue> {
+         class SelfT,
+         EmOnSetValueCallbackType<SelfT, EmTagValue> OnSetValue>
+class EmNexCfgIntegerTagEx: public EmValueEx<EmNexCfgIntegerTag<tPage>, SelfT, EmTagValue, OnSetValue> {
 public:
 public:
-    using EmValueEx<EmNexCfgIntegerTag<tPage>, EmTagValue, OnSetValue>::EmValueEx;
+    using EmValueEx<EmNexCfgIntegerTag<tPage>, SelfT, EmTagValue, OnSetValue>::EmValueEx;
 };
 
 #endif // __EM_NEXTION_EX__
