@@ -8,6 +8,7 @@
 #include "em_serial.h"
 #include "em_optional.h"
 #include "em_value_sync.h"
+#include "em_tag.h"
 
 // NOTE:
 // The following classes have no virtual methods. 
@@ -786,6 +787,7 @@ protected:
         return EmNexInteger<tPage>::setValue(value.asInteger());
     }
 
+    // Member vars
     bool m_isInitialized;   
 };
 
