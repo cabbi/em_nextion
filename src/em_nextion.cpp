@@ -63,7 +63,7 @@ EmGetValueResult EmNextion::recv_(uint8_t ackCode,
     uint8_t term_count=0;
     uint8_t buf_pos=0;
     EmTimeout rxTimeout(m_timeoutMs);
-    while (!rxTimeout.isElapsed(false)) {
+    while (!rxTimeout.isExpired(false)) {
         while (m_serial.available()) {
             uint8_t c = static_cast<uint8_t>(m_serial.read());
             // Still waiting for ack code?

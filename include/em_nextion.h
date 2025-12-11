@@ -709,11 +709,11 @@ public:
     //  (i.e. if display value is greater than maxValue, maxValue is assigned to 'value').
     // 'dispInitialValue' is the optional initial value of the display element on power on
     //  (i.e. if the display value is equal to 'dispInitialValue' then this element is considered uninitialized).
-    template<typename T, typename V>
-    bool updateValue(EmValue<T>& value, 
-                     EmOptional<V> minValue = emUndefined,
-                     EmOptional<V> maxValue = emUndefined,
-                     EmOptional<V> dispInitialValue = emUndefined) {
+    template<class T>
+    bool updateValue(T& value, 
+                     EmOptional<int32_t> minValue = emUndefined,
+                     EmOptional<int32_t> maxValue = emUndefined,
+                     EmOptional<int32_t> dispInitialValue = emUndefined) {
         // Set or get value ONLY if not on that page!
         if (tPage.isCurrent()) {
             return false;
@@ -721,7 +721,7 @@ public:
         // Value already set the first time?
         if (m_isInitialized) {
             // Get value from display
-            T dispValue;
+            int32_t dispValue;
             if (getValue_(dispValue)) {
                 if (dispInitialValue.hasValue() && dispValue == dispInitialValue.value()) {
                     // Somehow variable got reset (display power off?)
@@ -739,7 +739,7 @@ public:
         }
         // Need to set the value?
         if (!isInitialized()) {
-            T dispValue = T();
+            int32_t dispValue;
             if (EmGetValueResult::failed != value.getValue(dispValue)) {
                 m_isInitialized = setValue_(dispValue);
             }
@@ -767,6 +767,10 @@ protected:
         return EmNexInteger<tPage>::getValue(value) != EmGetValueResult::failed;
     }
 
+    bool setValue_(int32_t value) {
+        return EmNexInteger<tPage>::setValue(value);
+    }
+
     bool getValue_(EmTagValue& value) {
         int32_t dispValue = value.isType(EmTagValueType::vt_integer) ? value.asInteger() : 0;
         EmGetValueResult res = EmNexInteger<tPage>::getValue(dispValue);
@@ -774,10 +778,6 @@ protected:
             return value.setValue(dispValue, false);
         }
         return EmGetValueResult::failed != res;
-    }
-
-    bool setValue_(int32_t value) {
-        return EmNexInteger<tPage>::setValue(value);
     }
 
     bool setValue_(EmTagValue value) {

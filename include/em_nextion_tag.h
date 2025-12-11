@@ -256,9 +256,10 @@ public:
     virtual bool updateValue(EmOptional<int32_t> minValue = emUndefined,
                              EmOptional<int32_t> maxValue = emUndefined,
                              EmOptional<int32_t> dispInitialValue = emUndefined) {
-        return EmNexTagBase<EmNexCfgInteger<tPage>, int32_t>::updateValue<tPage>(*this, minValue, maxValue, dispInitialValue);
+        // DIDN'T get compiler accept this syntax.... :()
+        //return EmNexTagBase<EmNexCfgInteger<tPage>, int32_t>::updateValue<EmTagBase>(*this, minValue, maxValue, dispInitialValue);
+        return EmNexTagBase<EmNexCfgInteger<tPage>, int32_t>::updateValue(static_cast<EmTagBase&>(*this), minValue, maxValue, dispInitialValue);
     }                                
-
 };
 
 // This class provides 'EmNexCfgIntegerTag' plus an 'onSetValue' callback.
