@@ -5,9 +5,12 @@
 #include "em_defs.h"
 
 
-bool EmNextion::begin(unsigned long baud) const
+bool EmNextion::begin(uint32_t baud, int8_t rxPin, int8_t txPin) const
 {
-    m_serial.begin(baud);
+    m_serial.begin(static_cast<unsigned long>(baud), 
+                   SERIAL_8N1, 
+                   rxPin, 
+                   txPin);
     return begin_();
 }
 
@@ -142,6 +145,9 @@ bool EmNextion::isCurPage(uint8_t pageId) const {
 
 bool EmNextion::getCurPage(uint8_t& pageId) const 
 {
+#ifdef EM_MULTITHREAD
+    EmMutexLock lock(m_serialLock);
+#endif
     if (!sendCmd_("sendme", NULL)) {
         return false;
     }
@@ -154,6 +160,9 @@ bool EmNextion::getCurPage(uint8_t& pageId) const
 
 bool EmNextion::setCurPage(uint8_t pageId) const 
 {
+#ifdef EM_MULTITHREAD
+    EmMutexLock lock(m_serialLock);
+#endif
     char buf[3];
     if (!sendCmd_("page ", to_str(buf, 3, pageId), NULL)) {
         return false;
@@ -163,6 +172,9 @@ bool EmNextion::setCurPage(uint8_t pageId) const
 
 bool EmNextion::setCurPage(const char* pageName) const 
 {
+#ifdef EM_MULTITHREAD
+    EmMutexLock lock(m_serialLock);
+#endif
     if (!sendCmd_("page ", pageName, NULL)) {
         return false;
     }
@@ -173,6 +185,9 @@ EmGetValueResult EmNextion::getNumElementValue(const char* pageName,
                                                const char* elementName, 
                                                int32_t& val) const 
 {
+#ifdef EM_MULTITHREAD
+    EmMutexLock lock(m_serialLock);
+#endif
     EmGetValueResult res = EmGetValueResult::failed;
     if (sendGetCmd_(pageName, elementName, "val")) {
         res = getNumber_(val);
@@ -189,6 +204,9 @@ EmGetValueResult EmNextion::getNumElementValue(const char* pageName,
 bool EmNextion::setNumElementValue(const char* pageName, 
                                    const char* elementName, 
                                    int32_t val) const {
+#ifdef EM_MULTITHREAD
+    EmMutexLock lock(m_serialLock);
+#endif
     bool res = false;
     if (sendSetCmd_(pageName, elementName, "val", val)) {
         res = ack_(ACK_CMD_SUCCEED);
@@ -203,6 +221,9 @@ bool EmNextion::setNumElementValue(const char* pageName,
 bool EmNextion::setTextElementValue(const char* pageName, 
                                     const char* elementName, 
                                     const char* txt) const {
+#ifdef EM_MULTITHREAD
+    EmMutexLock lock(m_serialLock);
+#endif
     bool res = false;
     if (sendSetCmd_(pageName, elementName, "txt", txt)) {
         res = ack_(ACK_CMD_SUCCEED);
@@ -216,6 +237,9 @@ bool EmNextion::setTextElementValue(const char* pageName,
 
 bool EmNextion::setVisible(const char* elementName, 
                            bool visible) const {
+#ifdef EM_MULTITHREAD
+    EmMutexLock lock(m_serialLock);
+#endif
     bool res = false;
     if (sendCmd_("vis ", elementName, visible ? ",1" : ",0", NULL)) {
         res = ack_(ACK_CMD_SUCCEED);
@@ -236,6 +260,9 @@ bool EmNextion::setVisible(uint8_t pageId,
 bool EmNextion::setPicture(const char* pageName, 
                            const char* elementName, 
                            uint8_t picId) const {
+#ifdef EM_MULTITHREAD
+    EmMutexLock lock(m_serialLock);
+#endif
     bool res = false;
     if (sendSetCmd_(pageName, elementName, "pic", picId)) {
         res = ack_(ACK_CMD_SUCCEED);
@@ -250,6 +277,9 @@ bool EmNextion::setPicture(const char* pageName,
 bool EmNextion::getPicture(const char* pageName, 
                            const char* elementName, 
                            uint8_t& picId) const {
+#ifdef EM_MULTITHREAD
+    EmMutexLock lock(m_serialLock);
+#endif
     bool res = false;
     if (sendGetCmd_(pageName, elementName, "val")) {
         int32_t val;
@@ -267,6 +297,9 @@ bool EmNextion::getPicture(const char* pageName,
 
 bool EmNextion::click(const char* elementName, 
                       bool pressed) const {
+#ifdef EM_MULTITHREAD
+    EmMutexLock lock(m_serialLock);
+#endif
     bool res = false;
     if (sendCmd_("click ", elementName, pressed ? ",1" : ",0", NULL)) {
         res = ack_(ACK_CMD_SUCCEED);

@@ -6,6 +6,7 @@
 #include "em_defs.h"
 #include "em_log.h"
 #include "em_serial.h"
+#include "em_threading.h"
 #include "em_optional.h"
 #include "em_value_sync.h"
 #include "em_tag.h"
@@ -73,7 +74,7 @@ public:
         m_timeoutMs(timeoutMs),
         m_isInit(false) {}
 
-    bool begin(unsigned long baud) const;
+    bool begin(uint32_t baud, int8_t rxPin=-1, int8_t txPin=-1) const;
 
     bool isInit() const { 
         return m_isInit;
@@ -94,6 +95,9 @@ public:
                                          char* txt) const {
         // Create a copy in case communication fails
         // (i.e. some bytes might be modified by _recv method!)
+    #ifdef EM_MULTITHREAD
+        EmMutexLock lock(m_serialLock);
+    #endif
         char dispTxt[max_str_len+1];
         strncpy(dispTxt, txt, max_str_len);
         EmGetValueResult res = EmGetValueResult::failed;
@@ -151,6 +155,9 @@ public:
     bool setBkColor(const char* pageName, 
                     const char* elementName, 
                     uint16_t color565) const {
+    #ifdef EM_MULTITHREAD
+        EmMutexLock lock(m_serialLock);
+    #endif
         return setColor_(pageName, elementName, "bco", color565);
     }
 
@@ -171,6 +178,9 @@ public:
     bool getBkColor(const char* pageName, 
                     const char* elementName, 
                     uint16_t& color565) const {
+    #ifdef EM_MULTITHREAD
+        EmMutexLock lock(m_serialLock);
+    #endif
         return getColor_(pageName, elementName, "bco", color565);
     }
 
@@ -188,6 +198,9 @@ public:
     bool setFontColor(const char* pageName, 
                       const char* elementName, 
                       uint16_t color565) const {
+    #ifdef EM_MULTITHREAD
+        EmMutexLock lock(m_serialLock);
+    #endif
         return setColor_(pageName, elementName, "pco", color565);
     }
 
@@ -208,6 +221,9 @@ public:
     bool getFontColor(const char* pageName, 
                       const char* elementName, 
                       uint16_t& color565) const {
+    #ifdef EM_MULTITHREAD
+        EmMutexLock lock(m_serialLock);
+    #endif
         return getColor_(pageName, elementName, "pco", color565);
     }
 
@@ -266,6 +282,9 @@ private:
     EmSerialStream& m_serial;       
     const uint32_t m_timeoutMs;
     mutable bool m_isInit;
+#ifdef EM_MULTITHREAD
+    mutable EmMutex m_serialLock;
+#endif
 };
 
 // The base nextion object class
