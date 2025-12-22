@@ -4,6 +4,39 @@
 #include "em_timeout.h"
 #include "em_defs.h"
 
+bool EmNextion::scanBaudrate(uint32_t& baud, int8_t rxPin, int8_t txPin) const {
+#ifdef EM_MULTITHREAD
+    EmMutexLock lock(m_display.m_serialLock);
+#endif
+    // This procedure follows the official Nextion recommendations at page:
+    // https://nextion.tech/2017/12/08/nextion-hmi-upload-protocol-v1-1/
+    baud = 0;
+    uint32_t bauds[] = {4800, 921600, 512000, 500000, 460800, 256000, 250000, 230400, 192000, 
+                        128000, 115200, 74880, 57600, 38400, 31250, 19200, 9600, 4800, 2400};
+    const char msg[] = "DRAKJHSUYDGBNCJHGJKSHBDN" 
+                       "\xFF\xFF\xFF" 
+                       "connect" 
+                       "\xFF\xFF\xFF\xFF\xFF" 
+                       "connect" 
+                       "\xFF\xFF\xFF";
+    for (size_t i=0; i<sizeof(bauds)/sizeof(bauds[0]); i++) {        
+        uint32_t testBaud = bauds[i];
+        m_serial.begin(testBaud, SERIAL_8N1, rxPin, txPin);
+        m_serial.write(msg, sizeof(msg)-1);
+        EmString<100> res;
+        if (recv_('c', res.buffer(), res.capacity(), true, 100) != EmGetValueResult::failed &&
+            res.startsWith("omok")) {
+            baud = testBaud;
+            return true;
+        }
+        // Drain any remaining bytes during the suggested timeout between two attempts
+        EmTimeout timeout((1000000UL/testBaud) + 30);
+        while (!timeout.isExpired()) {
+            m_serial.read();
+        }
+    }
+    return false;
+}
 
 bool EmNextion::begin(uint32_t baud, int8_t rxPin, int8_t txPin) const
 {
@@ -21,6 +54,25 @@ bool EmNextion::begin_() const
     sendCmdEnd_();
     m_isInit = ack_(ACK_CMD_SUCCEED);
     return m_isInit;
+}
+
+bool EmNextion::wakeup() {
+#ifdef EM_MULTITHREAD
+    EmMutexLock lock(m_display.m_serialLock);
+#endif
+    // Try multiple times to ensure wakeup
+    for (uint8_t i=0; i<3; i++) {
+        // NOTE: cannot use 'sendCmd_' since 'begin_' will fail if display is sleeping!
+        sendCmdParam_("sleep=0");
+        sendCmdEnd_();
+        delay(10);
+        sendCmdParam_("bkcmd=3"); // Get 'ack' char back from commands!
+        sendCmdEnd_();
+        if (ack_(ACK_CMD_SUCCEED, 500)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 bool EmNextion::sendCmd_(const char* firstCmd, ...) const
@@ -58,14 +110,15 @@ bool EmNextion::sendCmdEnd_() const
 EmGetValueResult EmNextion::recv_(uint8_t ackCode, 
                                   char* buf, 
                                   uint8_t len, 
-                                  bool isText) const
+                                  bool isText,
+                                  uint32_t timeoutMs) const
 {
     bool value_changed = false;
     bool got_ackCode=false;
     bool got_buffer=(len==0);
     uint8_t term_count=0;
     uint8_t buf_pos=0;
-    EmTimeout rxTimeout(m_timeoutMs);
+    EmTimeout rxTimeout(timeoutMs ? timeoutMs : m_timeoutMs);
     while (!rxTimeout.isExpired(false)) {
         while (m_serial.available()) {
             uint8_t c = static_cast<uint8_t>(m_serial.read());
@@ -132,10 +185,10 @@ bool EmNextion::bResult_(bool result) const
     return result;
 }
 
-bool EmNextion::ack_(uint8_t ackCode) const 
+bool EmNextion::ack_(uint8_t ackCode, uint32_t timeoutMs) const 
 {
     logDebug(F("Waiting ACK"));
-    return EmGetValueResult::failed != recv_(ackCode, NULL, 0);
+    return EmGetValueResult::failed != recv_(ackCode, NULL, 0, false, timeoutMs);
 }
 
 bool EmNextion::isCurPage(uint8_t pageId) const {

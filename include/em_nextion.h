@@ -59,11 +59,15 @@ inline void fromColor565(uint16_t color565, uint8_t& red, uint8_t& green, uint8_
     blue  = (color565 & 0x001F) << 3; // ............bbbbb -> bbbbb000
 }
 
+// Forward declaration
+class EmNextionOtaUpdater;
+
 // The main nextion display handling class.
 // 
 // The 'serial' object must be an 'EmSerialStream' implementation like 'EmHardwareSerial'.
 // The instance 'begin' method will call the 'serial' object begin as well.
 class EmNextion: public EmLog {
+    friend class EmNextionOtaUpdater;
 public:
     EmNextion(EmSerialStream& serial, 
               uint32_t timeoutMs, 
@@ -73,22 +77,30 @@ public:
         m_serial(serial),
         m_timeoutMs(timeoutMs),
         m_isInit(false) {}
+    
+    // Scan for the correct baudrate of the connected nextion display.
+    bool scanBaudrate(uint32_t& baud, int8_t rxPin=-1, int8_t txPin=1) const;
 
+    // Begins the nextion display communication.
     bool begin(uint32_t baud, int8_t rxPin=-1, int8_t txPin=-1) const;
 
+    // Returns true if the display is initialized (i.e. awake and actively responding to commands).
     bool isInit() const { 
         return m_isInit;
     }
 
+    // Page handling methods
     bool isCurPage(uint8_t pageId) const;
     bool getCurPage(uint8_t& pageId) const;
     bool setCurPage(uint8_t pageId) const;
     bool setCurPage(const char* pageName) const;
 
+    // Get numeric element value.
     EmGetValueResult getNumElementValue(const char* pageName, 
                                         const char* elementName, 
                                         int32_t& val) const;
 
+    // Get text element value.
     template<size_t max_str_len>
     EmGetValueResult getTextElementValue(const char* pageName, 
                                          const char* elementName, 
@@ -111,12 +123,18 @@ public:
         return res;
     }
 
+    // Set numeric element value.
     bool setNumElementValue(const char* pageName, 
                             const char* elementName, 
                             int32_t val) const;
+    
+    // Set text element value.
     bool setTextElementValue(const char* pageName, 
                              const char* elementName, 
                              const char* txt) const;
+
+    // Wakeup display in case it is in sleep mode
+    bool wakeup();
 
     // Set element visibility.
     //
@@ -261,11 +279,12 @@ protected:
     bool sendCmd_(const char* firstCmd, ...) const;
     bool sendCmdParam_(const char* cmdParam) const;
     bool sendCmdEnd_() const;
-    bool ack_(uint8_t ackCode) const;
+    bool ack_(uint8_t ackCode, uint32_t timeoutMs=0) const;
     EmGetValueResult recv_(uint8_t ackCode, 
                            char* buf, 
                            uint8_t len, 
-                           bool isText=false) const;
+                           bool isText=false,
+                           uint32_t timeoutMs=0) const;
     EmGetValueResult result_(bool result, bool valueChanged) const;
     bool bResult_(bool result) const;
 
