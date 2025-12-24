@@ -20,8 +20,7 @@ public:
     virtual bool update(Stream& client, size_t contentLength) override;
         
 protected:
-    void tx_(const char* buf);
-    void tx_(const char* buf, size_t size);
+    void tx_(const char* cmd);
     bool rx_(char* buf, size_t maxSize);
     bool uploadPacket_(Stream& client, size_t size, bool skip);
 

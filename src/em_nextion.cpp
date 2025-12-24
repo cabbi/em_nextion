@@ -13,7 +13,7 @@ bool EmNextion::scanBaudrate(uint32_t& baud, int8_t rxPin, int8_t txPin) const {
     // This procedure follows the official Nextion recommendations at page:
     // https://nextion.tech/2017/12/08/nextion-hmi-upload-protocol-v1-1/
 #ifdef EM_MULTITHREAD
-    EmMutexLock lock(m_display.m_serialLock);
+    EmMutexLock lock(m_serialLock);
 #endif
     baud = 0;
     uint32_t bauds[] = {921600, 512000, 500000, 460800, 256000, 250000, 230400, 192000, 
@@ -60,7 +60,7 @@ bool EmNextion::begin(uint32_t baud, int8_t rxPin, int8_t txPin) const
 bool EmNextion::begin_() const
 {
     // Have command feedback on both success/fail  
-    sendCmdParam_("bkcmd=3");
+    sendCmdParam_("bkcmd=3", true);
     sendCmdEnd_();
     m_isInit = ack_(ACK_CMD_SUCCEED);
     return m_isInit;
@@ -68,15 +68,15 @@ bool EmNextion::begin_() const
 
 bool EmNextion::wakeup() {
 #ifdef EM_MULTITHREAD
-    EmMutexLock lock(m_display.m_serialLock);
+    EmMutexLock lock(m_serialLock);
 #endif
     // Try multiple times to ensure wakeup
     for (uint8_t i=0; i<3; i++) {
         // NOTE: cannot use 'sendCmd_' since 'begin_' will fail if display is sleeping!
-        sendCmdParam_("sleep=0");
+        sendCmdParam_("sleep=0", true);
         sendCmdEnd_();
         delay(10);
-        sendCmdParam_("bkcmd=3"); // Get 'ack' char back from commands!
+        sendCmdParam_("bkcmd=3", true); // Get 'ack' char back from commands!
         sendCmdEnd_();
         if (ack_(ACK_CMD_SUCCEED, 500)) {
             return true;
@@ -91,8 +91,7 @@ bool EmNextion::sendCmd_(const char* firstCmd, ...) const
     if (!m_isInit && !begin_()) {
         return false;
     }
-    m_serial.flush();
-    sendCmdParam_(firstCmd);
+    sendCmdParam_(firstCmd, true);
     va_list args;
     va_start(args, firstCmd);     
     const char* cmdParam = va_arg(args, const char*);
@@ -105,10 +104,10 @@ bool EmNextion::sendCmd_(const char* firstCmd, ...) const
     return sendCmdEnd_();
 }
 
-bool EmNextion::sendCmdParam_(const char* cmdParam, bool clearRxBuf) const
+bool EmNextion::sendCmdParam_(const char* cmdParam, bool flushTxRxBuffers) const
 {
-    if (clearRxBuf) {
-        m_serial.clearRxBuffer();
+    if (flushTxRxBuffers) {
+        m_serial.flush(true);
     }
     return bResult_(m_serial.write(cmdParam) > 0);
 }

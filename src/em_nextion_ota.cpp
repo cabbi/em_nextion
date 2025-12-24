@@ -19,7 +19,7 @@ bool EmNextionOtaUpdater::update(Stream& client, size_t contentLength) {
         return false;
     }
 #ifdef EM_MULTITHREAD
-    EmMutexLock lock(m_display.m_serialLock);
+    EmMutexLock lock(m_disp.m_serialLock);
 #endif
     #define R_ACK 0x05
     #define R_SKIP 0x08
@@ -67,14 +67,11 @@ bool EmNextionOtaUpdater::update(Stream& client, size_t contentLength) {
     return true;
 }
 
-void EmNextionOtaUpdater::tx_(const char* buf) {
-    tx_(buf, strlen(buf));
-    tx_("\xFF\xFF\xFF", 3);
+void EmNextionOtaUpdater::tx_(const char* cmd) {
+    m_disp.m_serial.flush(true);
+    m_disp.m_serial.write(cmd, strlen(cmd));
+    m_disp.m_serial.write("\xFF\xFF\xFF", 3);
 }    
-
-void EmNextionOtaUpdater::tx_(const char* buf, size_t size) {
-    m_disp.m_serial.write(buf, size);
-}
 
 bool EmNextionOtaUpdater::rx_(char* buf, size_t size) {
     uint8_t term_count=0;

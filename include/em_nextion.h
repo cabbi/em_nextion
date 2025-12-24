@@ -281,7 +281,7 @@ protected:
 
 
     bool sendCmd_(const char* firstCmd, ...) const;
-    bool sendCmdParam_(const char* cmdParam, bool clearRxBuf=true) const;
+    bool sendCmdParam_(const char* cmdParam, bool flushTxRxBuffers=true) const;
     bool sendCmdEnd_() const;
     bool ack_(uint8_t ackCode, uint32_t timeoutMs=0) const;
     EmGetValueResult recv_(uint8_t ackCode, 
