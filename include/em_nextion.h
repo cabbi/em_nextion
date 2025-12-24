@@ -82,7 +82,7 @@ public:
 #ifdef EM_HW_SERIAL_AVR
     bool scanBaudrate(uint32_t& baud) const;
 #else
-    bool scanBaudrate(uint32_t& baud, int8_t rxPin, int8_t txPin) const;
+    bool scanBaudrate(uint32_t& baud, int8_t rxPin=-1, int8_t txPin=-1) const;
 #endif        
 
     // Begins the nextion display communication.
