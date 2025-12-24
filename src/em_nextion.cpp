@@ -1,17 +1,22 @@
 #include <stdarg.h>
 
-#include "em_nextion.h"
-#include "em_timeout.h"
 #include "em_defs.h"
+#include "em_string.h"
+#include "em_timeout.h"
+#include "em_nextion.h"
 
+#ifdef EM_HW_SERIAL_AVR
+bool EmNextion::scanBaudrate(uint32_t& baud) const {
+#else
 bool EmNextion::scanBaudrate(uint32_t& baud, int8_t rxPin, int8_t txPin) const {
+#endif        
+    // This procedure follows the official Nextion recommendations at page:
+    // https://nextion.tech/2017/12/08/nextion-hmi-upload-protocol-v1-1/
 #ifdef EM_MULTITHREAD
     EmMutexLock lock(m_display.m_serialLock);
 #endif
-    // This procedure follows the official Nextion recommendations at page:
-    // https://nextion.tech/2017/12/08/nextion-hmi-upload-protocol-v1-1/
     baud = 0;
-    uint32_t bauds[] = {4800, 921600, 512000, 500000, 460800, 256000, 250000, 230400, 192000, 
+    uint32_t bauds[] = {921600, 512000, 500000, 460800, 256000, 250000, 230400, 192000, 
                         128000, 115200, 74880, 57600, 38400, 31250, 19200, 9600, 4800, 2400};
     const char msg[] = "DRAKJHSUYDGBNCJHGJKSHBDN" 
                        "\xFF\xFF\xFF" 
@@ -21,7 +26,11 @@ bool EmNextion::scanBaudrate(uint32_t& baud, int8_t rxPin, int8_t txPin) const {
                        "\xFF\xFF\xFF";
     for (size_t i=0; i<sizeof(bauds)/sizeof(bauds[0]); i++) {        
         uint32_t testBaud = bauds[i];
+    #ifdef EM_HW_SERIAL_AVR
+        m_serial.begin(testBaud, SERIAL_8N1);
+    #else
         m_serial.begin(testBaud, SERIAL_8N1, rxPin, txPin);
+    #endif        
         m_serial.write(msg, sizeof(msg)-1);
         EmString<100> res;
         if (recv_('c', res.buffer(), res.capacity(), true, 100) != EmGetValueResult::failed &&
@@ -40,10 +49,11 @@ bool EmNextion::scanBaudrate(uint32_t& baud, int8_t rxPin, int8_t txPin) const {
 
 bool EmNextion::begin(uint32_t baud, int8_t rxPin, int8_t txPin) const
 {
-    m_serial.begin(static_cast<unsigned long>(baud), 
-                   SERIAL_8N1, 
-                   rxPin, 
-                   txPin);
+#ifdef EM_HW_SERIAL_AVR
+    m_serial.begin(static_cast<unsigned long>(baud), SERIAL_8N1);
+#else
+    m_serial.begin(static_cast<unsigned long>(baud), SERIAL_8N1, rxPin, txPin);
+#endif        
     return begin_();
 }
 
@@ -87,7 +97,7 @@ bool EmNextion::sendCmd_(const char* firstCmd, ...) const
     va_start(args, firstCmd);     
     const char* cmdParam = va_arg(args, const char*);
     while (cmdParam) {
-        sendCmdParam_(cmdParam);
+        sendCmdParam_(cmdParam, false);
         cmdParam = va_arg(args, const char*);
     }
     va_end(args);
@@ -95,8 +105,11 @@ bool EmNextion::sendCmd_(const char* firstCmd, ...) const
     return sendCmdEnd_();
 }
 
-bool EmNextion::sendCmdParam_(const char* cmdParam) const
+bool EmNextion::sendCmdParam_(const char* cmdParam, bool clearRxBuf) const
 {
+    if (clearRxBuf) {
+        m_serial.clearRxBuffer();
+    }
     return bResult_(m_serial.write(cmdParam) > 0);
 }
 

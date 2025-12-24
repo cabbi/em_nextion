@@ -1,5 +1,6 @@
+#include "em_string.h"
+#include "em_timeout.h"
 #include "em_nextion_ota.h"
-#include <em_timeout.h>
 
 uint32_t bytesToInt(const char* p) {
     return ((uint32_t)p[0])       |

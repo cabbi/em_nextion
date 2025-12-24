@@ -79,7 +79,11 @@ public:
         m_isInit(false) {}
     
     // Scan for the correct baudrate of the connected nextion display.
-    bool scanBaudrate(uint32_t& baud, int8_t rxPin=-1, int8_t txPin=1) const;
+#ifdef EM_HW_SERIAL_AVR
+    bool scanBaudrate(uint32_t& baud) const;
+#else
+    bool scanBaudrate(uint32_t& baud, int8_t rxPin, int8_t txPin) const;
+#endif        
 
     // Begins the nextion display communication.
     bool begin(uint32_t baud, int8_t rxPin=-1, int8_t txPin=-1) const;
@@ -277,7 +281,7 @@ protected:
 
 
     bool sendCmd_(const char* firstCmd, ...) const;
-    bool sendCmdParam_(const char* cmdParam) const;
+    bool sendCmdParam_(const char* cmdParam, bool clearRxBuf=true) const;
     bool sendCmdEnd_() const;
     bool ack_(uint8_t ackCode, uint32_t timeoutMs=0) const;
     EmGetValueResult recv_(uint8_t ackCode, 
@@ -730,7 +734,7 @@ protected:
 // TODO: handle uninitialized elements on startup (i.e. alternatives to 'dispInitialValue' parameter)
 //       This should be done in case the display powers off an on while controller is still running.
 //       If this happens configuration values need to be re-initialized to the display.
-template<EmNexPage& tPage>
+template<EmNexPage& tPage, typename ValueType=int32_t>
 class EmNexCfgInteger: public EmNexInteger<tPage> {
 public: 
     EmNexCfgInteger(const char* name,
@@ -759,7 +763,7 @@ public:
         // Value already set the first time?
         if (m_isInitialized) {
             // Get value from display
-            int32_t dispValue;
+            ValueType dispValue;
             if (getValue_(dispValue)) {
                 if (dispInitialValue.hasValue() && dispValue == dispInitialValue.value()) {
                     // Somehow variable got reset (display power off?)
@@ -777,7 +781,7 @@ public:
         }
         // Need to set the value?
         if (!isInitialized()) {
-            int32_t dispValue;
+            ValueType dispValue;
             if (EmGetValueResult::failed != value.getValue(dispValue)) {
                 m_isInitialized = setValue_(dispValue);
             }
@@ -809,6 +813,7 @@ protected:
         return EmNexInteger<tPage>::setValue(value);
     }
 
+#ifdef EM_STD_LIB // Need standard library 
     bool getValue_(EmTagValue& value) {
         int32_t dispValue = value.isType(EmTagValueType::vt_integer) ? value.asInteger() : 0;
         EmGetValueResult res = EmNexInteger<tPage>::getValue(dispValue);
@@ -824,6 +829,7 @@ protected:
         }
         return EmNexInteger<tPage>::setValue(value.asInteger());
     }
+#endif // EM_STD_LIB
 
     // Member vars
     bool m_isInitialized;   
