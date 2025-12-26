@@ -41,7 +41,9 @@ bool EmNextion::scanBaudrate(uint32_t& baud, int8_t rxPin, int8_t txPin) const {
         // Drain any remaining bytes during the suggested timeout between two attempts
         EmTimeout timeout((1000000UL/testBaud) + 30);
         while (!timeout.isExpired()) {
-            m_serial.read();
+            while (m_serial.available()) {
+                m_serial.read();
+            }
         }
     }
     return false;
