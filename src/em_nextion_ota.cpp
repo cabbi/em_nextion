@@ -29,9 +29,10 @@ bool EmNextionOtaUpdater::update(Stream& client, size_t contentLength) {
     EmString<50> cmd;
     cmd.format("whmi-wri %u,%u,1", contentLength, m_disp.m_serial.baudRate());
     tx_(cmd);
-    if (!rx_(rxBuf, 1) || rxBuf[0] != R_ACK) {
+    if (!rx_(R_ACK)) {
         m_disp.logError(F("OTA: No response for 'whmi-wri' command!"));
-        return false;
+        // Lets try to send the first packet!
+        //return false;
     }
 
     // Start transmitting firmware packets
@@ -73,6 +74,19 @@ void EmNextionOtaUpdater::tx_(const char* cmd) {
     m_disp.m_serial.write("\xFF\xFF\xFF", 3);
 }    
 
+bool EmNextionOtaUpdater::rx_(char rxChar) {
+    EmTimeout rxTimeout(500);
+    while (!rxTimeout.isExpired(false)) {
+        while (m_disp.m_serial.available()) {
+            char c = static_cast<char>(m_disp.m_serial.read());
+            if (c == rxChar) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 bool EmNextionOtaUpdater::rx_(char* buf, size_t size) {
     uint8_t term_count=0;
     uint8_t buf_pos=0;
@@ -96,7 +110,7 @@ bool EmNextionOtaUpdater::rx_(char* buf, size_t size) {
 
 bool EmNextionOtaUpdater::uploadPacket_(Stream& client, size_t size, bool skip) {
     // A timeout in case of slow streams (e.g. HTTP responses)
-    EmTimeout streamTimeout(100); 
+    EmTimeout streamTimeout(1000); 
     while (size > 0) {
         // Wait for stream data
         streamTimeout.restart();

@@ -22,6 +22,7 @@ public:
 protected:
     void tx_(const char* cmd);
     bool rx_(char* buf, size_t maxSize);
+    bool rx_(char rxChar);
     bool uploadPacket_(Stream& client, size_t size, bool skip);
 
     // Member vars
