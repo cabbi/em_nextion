@@ -12,6 +12,11 @@
 // Note that the "Nextion Editor" update files (.tft) are NOT using the "normal" firmware update, but
 // it is querying the display to grab differences and updating only edited/updated parts. This can ONLY
 // be done with the Nextion Editor (i.e. this updater will send the entire firmware file!).
+//
+// NOTE: the Nextion firmware update procedure gets stuck forever if not finalized.
+//       That said we try to get it to the end even with failure just to have the
+//       display in a state where it accepts another firmware update command.
+
 class EmNextionOtaUpdater : public EmOtaUpdater {
 public:
     EmNextionOtaUpdater(EmNextion& disp)
@@ -23,7 +28,10 @@ protected:
     void tx_(const char* cmd);
     bool rx_(char* buf, size_t maxSize);
     bool rx_(char rxChar);
-    bool uploadPacket_(Stream& client, size_t size, bool skip);
+    bool uploadPacket_(Stream& client, 
+                       size_t size, 
+                       bool& fillupMode,
+                       bool skip);
 
     // Member vars
     EmNextion& m_disp;

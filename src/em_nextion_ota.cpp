@@ -29,6 +29,7 @@ bool EmNextionOtaUpdater::update(Stream& client, size_t contentLength) {
     EmString<50> cmd;
     cmd.format("whmi-wri %u,%u,1", contentLength, m_disp.m_serial.baudRate());
     tx_(cmd);
+    
     if (!rx_(R_ACK)) {
         m_disp.logError(F("OTA: No response for 'whmi-wri' command!"));
         // Lets try to send the first packet!
@@ -37,11 +38,12 @@ bool EmNextionOtaUpdater::update(Stream& client, size_t contentLength) {
 
     // Start transmitting firmware packets
     bool skip = false;
+    bool fillupMode = false;
     size_t sentBytes = 0;
     size_t toSend = MIN(PACKET_SIZE, contentLength);
     while (sentBytes < contentLength) {
         // Send next packet
-        if (!uploadPacket_(client, toSend, skip)) {
+        if (!uploadPacket_(client, toSend, fillupMode, skip)) {
             return false;
         }
         sentBytes += toSend;
@@ -108,26 +110,35 @@ bool EmNextionOtaUpdater::rx_(char* buf, size_t size) {
     return buf_pos == size;
 }
 
-bool EmNextionOtaUpdater::uploadPacket_(Stream& client, size_t size, bool skip) {
-    // A timeout in case of slow streams (e.g. HTTP responses)
-    EmTimeout streamTimeout(1000); 
+bool EmNextionOtaUpdater::uploadPacket_(Stream& client, 
+                                        size_t size,
+                                        bool& fillupMode, 
+                                        bool skip) {
+    // A big timeout in case of slow streams (e.g. HTTP responses on weak wifi connection)
+    EmTimeout streamTimeout(3000); 
     while (size > 0) {
-        // Wait for stream data
-        streamTimeout.restart();
-        while (!client.available() && !streamTimeout.isExpired(false)) {
-            delay(1);
-        }
-        // Got data from stream?
-        if (!client.available()) {
-            m_disp.logError(F("OTA: stream data timeout!"));
-            return false;
-        }
-        // Read the stream byte
-        if (skip) {
-            client.read();
-        } else {
-            m_disp.m_serial.write(static_cast<uint8_t>(client.read()));
-        }   
+        if (fillupMode) {
+            // Filling up with zeros just to end up procedure and not get display stuck
+            // into the firmware update procedure where it does not react to any command.  
+            m_disp.m_serial.write(static_cast<uint8_t>(0));
+        } else { 
+            // Wait for stream data
+            streamTimeout.restart();
+            while (!client.available() && !streamTimeout.isExpired(true)) {
+                delay(1);
+            }
+            // Got data from stream?
+            if (!client.available()) {
+                m_disp.logError(F("OTA: stream data timeout, filling with zeros to end the procedure!"));
+                fillupMode = true;
+            }
+            // Read the stream byte
+            if (skip) {
+                client.read();
+            } else {
+                m_disp.m_serial.write(static_cast<uint8_t>(client.read()));
+            }  
+        } 
         size--;
     }
     return true;

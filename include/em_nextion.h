@@ -81,12 +81,22 @@ public:
     // Scan for the correct baudrate of the connected nextion display.
 #ifdef EM_HW_SERIAL_AVR
     bool scanBaudrate(uint32_t& baud) const;
-#else
-    bool scanBaudrate(uint32_t& baud, int8_t rxPin=-1, int8_t txPin=-1) const;
-#endif        
 
     // Begins the nextion display communication.
-    bool begin(uint32_t baud, int8_t rxPin=-1, int8_t txPin=-1) const;
+    // 
+    // If baud is set to zero (default) communication speed is 
+    // automatically determined by 'scanBaudrate'.
+    bool begin(uint32_t baud=0) const;
+#else
+    bool scanBaudrate(uint32_t& baud, int8_t rxPin=-1, int8_t txPin=-1) const;
+
+    // Begins the nextion display communication.
+    // 
+    // If baud is set to zero (default) communication speed is 
+    // automatically determined by 'scanBaudrate'.
+    bool begin(uint32_t baud=0, int8_t rxPin=-1, int8_t txPin=-1) const;
+#endif        
+
 
     // Returns true if the display is initialized (i.e. awake and actively responding to commands).
     bool isInit() const { 

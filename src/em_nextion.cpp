@@ -49,18 +49,23 @@ bool EmNextion::scanBaudrate(uint32_t& baud, int8_t rxPin, int8_t txPin) const {
     return false;
 }
 
-bool EmNextion::begin(uint32_t baud, int8_t rxPin, int8_t txPin) const
-{
 #ifdef EM_HW_SERIAL_AVR
+bool EmNextion::begin(uint32_t baud) const {
+    if (0 == baud && !scanBaudrate(baud)) {
+        return false;
+    }
     m_serial.begin(static_cast<unsigned long>(baud), SERIAL_8N1);
 #else
+bool EmNextion::begin(uint32_t baud, int8_t rxPin, int8_t txPin) const {
+    if (0 == baud && !scanBaudrate(baud)) {
+        return false;
+    }
     m_serial.begin(static_cast<unsigned long>(baud), SERIAL_8N1, rxPin, txPin);
 #endif        
     return begin_();
 }
 
-bool EmNextion::begin_() const
-{
+bool EmNextion::begin_() const {
     // Have command feedback on both success/fail  
     sendCmdParam_("bkcmd=3", true);
     sendCmdEnd_();
