@@ -19,8 +19,10 @@
 
 class EmNextionOtaUpdater : public EmOtaUpdater {
 public:
-    EmNextionOtaUpdater(EmNextion& disp)
-     : m_disp(disp) {}
+    EmNextionOtaUpdater(EmNextion& disp,
+                        EmDuration clientReadTimeout = EmDuration(3000))
+     : m_disp(disp),
+       m_clientReadTimeout(clientReadTimeout) {}
 
     virtual bool update(Stream& client, size_t contentLength) override;
         
@@ -35,6 +37,7 @@ protected:
 
     // Member vars
     EmNextion& m_disp;
+    EmDuration m_clientReadTimeout;
 };
 
 #endif //_EM_NEXTION_OTA_H__

@@ -115,7 +115,7 @@ bool EmNextionOtaUpdater::uploadPacket_(Stream& client,
                                         bool& fillupMode, 
                                         bool skip) {
     // A big timeout in case of slow streams (e.g. HTTP responses on weak wifi connection)
-    EmTimeout streamTimeout(3000); 
+    EmTimeout streamTimeout(m_clientReadTimeout); 
     while (size > 0) {
         if (fillupMode) {
             // Filling up with zeros just to end up procedure and not get display stuck
