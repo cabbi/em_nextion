@@ -46,7 +46,7 @@ public:
 
      EmNexTextTag(const char* name,
                   EmSyncFlags syncFlags,
-                  EmTags& tags,
+                  EmTagsAdd& tags,
                   EmLogLevel logLevel=EmLogLevel::global)
      : EmNexTextTag(name, syncFlags, logLevel) {
         tags.add(*this);
@@ -95,7 +95,7 @@ public:
 
      EmNexIntegerTag(const char* name,
                      EmSyncFlags syncFlags,
-                     EmTags& tags,
+                     EmTagsAdd& tags,
                     EmLogLevel logLevel=EmLogLevel::global)
      : EmNexIntegerTag(name, syncFlags, logLevel) {
         tags.add(*this);
@@ -141,7 +141,7 @@ public:
      EmNexRealTag(const char* name,
                   uint8_t decPlaces,
                   EmSyncFlags syncFlags,
-                  EmTags& tags,
+                  EmTagsAdd& tags,
                   EmLogLevel logLevel=EmLogLevel::global)
      : EmNexRealTag(name, decPlaces, syncFlags, logLevel) {
         tags.add(*this);
@@ -191,7 +191,7 @@ public:
                      const char* decElementName,
                      uint8_t decPlaces,
                      EmSyncFlags syncFlags,
-                     EmTags& tags,
+                     EmTagsAdd& tags,
                      EmLogLevel logLevel=EmLogLevel::global)
      : EmNexDecimalTag(intElementName, decElementName, decPlaces, syncFlags, logLevel) {
         tags.add(*this);
@@ -235,7 +235,7 @@ public:
 
     EmNexCfgIntegerTag(const char* name,
                        EmSyncFlags syncFlags,
-                       EmTags& tags,
+                       EmTagsAdd& tags,
                        EmLogLevel logLevel=EmLogLevel::global)
      : EmNexCfgIntegerTag<tPage>(name, syncFlags, logLevel) {
         tags.add(*this);

@@ -67,7 +67,7 @@ bool EmNextionOtaUpdater::update(Stream& client, size_t contentLength) {
             return false;
         }
     }
-    return true;
+    return !fillupMode;
 }
 
 void EmNextionOtaUpdater::tx_(const char* cmd) {
