@@ -77,7 +77,6 @@ template<EmNexPage& tPage,
          EmOnSetValueCallbackType<SelfT, EmTagValue> OnSetValue>
 class EmNexTextTagEx: public EmValueEx<EmNexTextTag<tPage, max_str_len>, SelfT, EmTagValue, OnSetValue> {
 public:
-public:
     using EmValueEx<EmNexTextTag<tPage, max_str_len>, SelfT, EmTagValue, OnSetValue>::EmValueEx;
 };
 
@@ -120,7 +119,6 @@ template<EmNexPage& tPage,
          class SelfT,
          EmOnSetValueCallbackType<SelfT, EmTagValue> OnSetValue>
 class EmNexIntegerTagEx: public EmValueEx<EmNexIntegerTag<tPage>, SelfT, EmTagValue, OnSetValue> {
-public:
 public:
     using EmValueEx<EmNexIntegerTag<tPage>, SelfT, EmTagValue, OnSetValue>::EmValueEx;
 };
@@ -166,7 +164,6 @@ template<EmNexPage& tPage,
          class SelfT,
          EmOnSetValueCallbackType<SelfT, EmTagValue> OnSetValue>
 class EmNexRealTagEx: public EmValueEx<EmNexRealTag<tPage>, SelfT, EmTagValue, OnSetValue> {
-public:
 public:
     using EmValueEx<EmNexRealTag<tPage>, SelfT, EmTagValue, OnSetValue>::EmValueEx;
 };
@@ -217,7 +214,6 @@ template<EmNexPage& tPage,
          EmOnSetValueCallbackType<SelfT, EmTagValue> OnSetValue>
 class EmNexDecimalTagEx: public EmValueEx<EmNexDecimalTag<tPage>, SelfT, EmTagValue, OnSetValue> {
 public:
-public:
     using EmValueEx<EmNexDecimalTag<tPage>, SelfT, EmTagValue, OnSetValue>::EmValueEx;
 };
 
@@ -267,7 +263,6 @@ template<EmNexPage& tPage,
          class SelfT,
          EmOnSetValueCallbackType<SelfT, EmTagValue> OnSetValue>
 class EmNexCfgIntegerTagEx: public EmValueEx<EmNexCfgIntegerTag<tPage>, SelfT, EmTagValue, OnSetValue> {
-public:
 public:
     using EmValueEx<EmNexCfgIntegerTag<tPage>, SelfT, EmTagValue, OnSetValue>::EmValueEx;
 };
