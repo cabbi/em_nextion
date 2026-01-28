@@ -570,6 +570,12 @@ public:
         return res;
     }
 
+    int32_t getValue() const {
+        int32_t value = 0;
+        getValue(value);
+        return value;
+    }
+
     EmGetValueResult getValue(int32_t& value) const {
         return this->nex().getNumElementValue(this->pageName(), 
                                               this->name(), 
@@ -607,16 +613,22 @@ public:
         }
         return res;
     }
+
+    double getValue() const {
+        double value = 0;
+        getValue(value);
+        return value;
+    }
+
+    EmGetValueResult getValue(double& value) const {
+        return getValue<double>(value);
+    }
  
     template <class real_type>
     bool setValue(real_type const value) {
         return this->nex().setNumElementValue(this->pageName(), 
                                              this->name(), 
                                              iRound<real_type>(value*iPow10(m_decPlaces)));
-    }
-
-    EmGetValueResult getValue(double& value) const {
-        return getValue<double>(value);
     }
 
     bool setValue(double value) const {
@@ -652,6 +664,12 @@ public:
                this->nex().setNumElementValue(this->pageName(), 
                                               this->m_decElementName, 
                                               dispValue % exp);        
+    }
+
+    double getValue() const {
+        double value = 0;
+        getValue(value);
+        return value;
     }
 
     EmGetValueResult getValue(float& value) const {
