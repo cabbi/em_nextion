@@ -31,6 +31,7 @@ bool EmNextion::scanBaudrate(uint32_t& baud, int8_t rxPin, int8_t txPin) const {
     #else
         m_serial.begin(testBaud, SERIAL_8N1, rxPin, txPin);
     #endif        
+        logDebug<30>("scan at boud: %d", testBaud);
         m_serial.write(msg, sizeof(msg)-1);
         EmString<100> res;
         if (recv_('c', res.buffer(), res.capacity(), true, 100) != EmGetValueResult::failed &&
@@ -82,7 +83,7 @@ bool EmNextion::wakeup() {
         // NOTE: cannot use 'sendCmd_' since 'begin_' will fail if display is sleeping!
         sendCmdParam_("sleep=0", true);
         sendCmdEnd_();
-        delay(10);
+        tDelay(10);
         sendCmdParam_("bkcmd=3", true); // Get 'ack' char back from commands!
         sendCmdEnd_();
         if (ack_(ACK_CMD_SUCCEED, 500)) {

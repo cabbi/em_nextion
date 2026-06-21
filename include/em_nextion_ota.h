@@ -1,6 +1,8 @@
 #ifndef _EM_NEXTION_OTA_H__
 #define _EM_NEXTION_OTA_H__
 
+#include "em_duration.h"
+
 #include "em_nextion.h"
 #include "em_ota_updater.h"
 

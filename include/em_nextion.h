@@ -61,7 +61,6 @@ inline void fromColor565(uint16_t color565, uint8_t& red, uint8_t& green, uint8_
 
 // Forward declaration
 class EmNextionOtaUpdater;
-void delay(uint32_t ms);
 
 // The main nextion display handling class.
 // 
@@ -811,7 +810,7 @@ public:
         // Need to set the value?
         if (!isInitialized()) {
             ValueType dispValue;
-            // NOTE: if you get an error here it is most probably have to:
+            // NOTE: if you get a compilation error here it is most probably have to:
             //        - explicitly define the type of T (i.e. the 'value')
             //          (e.g.  myCfgObj.updateValue<ValueClass>(value);)
             //        - your T class is missing the 'getValue' method definition of
