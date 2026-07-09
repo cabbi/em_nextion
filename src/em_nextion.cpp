@@ -33,7 +33,7 @@ bool EmNextion::scanBaudrate(uint32_t& baud, int8_t rxPin, int8_t txPin) const {
     #endif        
         logDebug<30>("scan at boud: %d", testBaud);
         m_serial.write(msg, sizeof(msg)-1);
-        EmString<100> res;
+        EmStringM res;
         if (recv_('c', res.buffer(), res.capacity(), true, 100) != EmGetValueResult::failed &&
             res.startsWith("omok")) {
             baud = testBaud;

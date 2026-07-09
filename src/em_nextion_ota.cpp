@@ -26,9 +26,9 @@ bool EmNextionOtaUpdater::update(Stream& client, size_t contentLength) {
     #define PACKET_SIZE 4096
     // Send 'whmi-wri' command
     char rxBuf[5];
-    EmString<50> cmd;
+    EmStringM cmd;
     cmd.format("whmi-wri %u,%u,1", contentLength, m_disp.m_serial.baudRate());
-    tx_(cmd);
+    tx_(cmd.c_str());
     
     if (!rx_(R_ACK)) {
         m_disp.logError(F("OTA: No response for 'whmi-wri' command!"));
