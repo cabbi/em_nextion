@@ -15,6 +15,6 @@
   "dependencies": {
     "cabbi/EmCore": ">=2.1.0"
   },  
-  "frameworks": ["arduino"],
+  "frameworks": ["arduino", "espidf"],
   "platforms": "*"
 }
