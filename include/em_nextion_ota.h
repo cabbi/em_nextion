@@ -26,13 +26,13 @@ public:
      : m_disp(disp),
        m_clientReadTimeout(clientReadTimeout) {}
 
-    virtual bool update(Stream& client, size_t contentLength) override;
+    virtual bool update(EmStream& client, size_t contentLength) override;
         
 protected:
     void tx_(const char* cmd);
     bool rx_(char* buf, size_t maxSize);
     bool rx_(char rxChar);
-    bool uploadPacket_(Stream& client, 
+    bool uploadPacket_(EmStream& client, 
                        size_t size, 
                        bool& fillupMode,
                        bool skip);

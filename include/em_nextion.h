@@ -530,7 +530,7 @@ public:
 
     template<size_t max_str_len>
     EmGetValueResult getValue(char* value) const {
-        return this->nex().getTextElementValue<max_str_len>(this->pageName(), this->name(), value);
+        return this->nex().template getTextElementValue<max_str_len>(this->pageName(), this->name(), value);
     }
 
     bool setValue(const char* value) const {

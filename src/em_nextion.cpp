@@ -25,11 +25,17 @@ bool EmNextion::scanBaudrate(uint32_t& baud, int8_t rxPin, int8_t txPin) const {
                        "connect" 
                        "\xFF\xFF\xFF";
     for (size_t i=0; i<sizeof(bauds)/sizeof(bauds[0]); i++) {        
-        uint32_t testBaud = bauds[i];
-    #ifdef EM_HW_SERIAL_AVR
+        uint32_t testBaud = bauds[i];    
+    #ifdef ARDUINO
+        #ifdef EM_HW_SERIAL_AVR
         m_serial.begin(testBaud, SERIAL_8N1);
-    #else
+        #else
         m_serial.begin(testBaud, SERIAL_8N1, rxPin, txPin);
+        #endif        
+    #elif ESP_PLATFORM
+        m_serial.begin(testBaud, rxPin, txPin);
+    #else
+        #error "Unsupported platform!"
     #endif        
         logDebug<30>("scan at boud: %d", testBaud);
         m_serial.write(msg, sizeof(msg)-1);
@@ -61,7 +67,13 @@ bool EmNextion::begin(uint32_t baud, int8_t rxPin, int8_t txPin) const {
     if (0 == baud && !scanBaudrate(baud)) {
         return false;
     }
+#endif        
+#ifdef ARDUINO
     m_serial.begin(static_cast<unsigned long>(baud), SERIAL_8N1, rxPin, txPin);
+#elif ESP_PLATFORM
+    m_serial.begin(static_cast<unsigned long>(baud), rxPin, txPin);
+#else
+    #error "Unsupported platform!"
 #endif        
     return begin_();
 }
@@ -236,8 +248,8 @@ bool EmNextion::setCurPage(uint8_t pageId) const
 #ifdef EM_MULTITHREAD
     EmMutexLock lock(m_serialLock);
 #endif
-    char buf[3];
-    if (!sendCmd_("page ", to_str(buf, 3, pageId), NULL)) {
+    char buf[11];
+    if (!sendCmd_("page ", to_str(buf, 10, pageId), NULL)) {
         return false;
     }
     return ack_(ACK_CMD_SUCCEED);

@@ -9,7 +9,7 @@ uint32_t bytesToInt(const char* p) {
            ((uint32_t)p[3] << 24);
 }
 
-bool EmNextionOtaUpdater::update(Stream& client, size_t contentLength) {
+bool EmNextionOtaUpdater::update(EmStream& client, size_t contentLength) {
     tx_("connect");
     char buf[100];
     rx_(buf, 100);
@@ -110,7 +110,7 @@ bool EmNextionOtaUpdater::rx_(char* buf, size_t size) {
     return buf_pos == size;
 }
 
-bool EmNextionOtaUpdater::uploadPacket_(Stream& client, 
+bool EmNextionOtaUpdater::uploadPacket_(EmStream& client, 
                                         size_t size,
                                         bool& fillupMode, 
                                         bool skip) {

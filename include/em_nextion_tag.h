@@ -19,7 +19,7 @@ public:
     }
 
     virtual EmGetValueResult getValue(EmTagValue& value) const {
-        T val;
+        T val = T();
         EmGetValueResult res = nexElement::getValue(val);
         if (EmGetValueResult::failed != res) {
             value.setValue(val, true);
@@ -58,7 +58,7 @@ public:
 
     virtual EmGetValueResult getValue(EmTagValue& value) const {
         char val[max_str_len+1];
-        EmGetValueResult res = EmNexText<tPage>::getValue<max_str_len>(val);
+        EmGetValueResult res = EmNexText<tPage>::template getValue<max_str_len>(val);
         if (EmGetValueResult::failed != res) {
             value.setValue(val, true);
         }
