@@ -37,7 +37,7 @@ bool EmNextion::scanBaudrate(uint32_t& baud, int8_t rxPin, int8_t txPin) const {
     #else
         #error "Unsupported platform!"
     #endif        
-        logDebug<30>("scan at boud: %d", testBaud);
+        logDebug<30>("scan at baud: %d", testBaud);
         m_serial.write(msg, sizeof(msg)-1);
         EmStringM res;
         if (recv_('c', res.buffer(), res.capacity(), true, 100) != EmGetValueResult::failed &&
@@ -194,7 +194,9 @@ EmGetValueResult EmNextion::recv_(uint8_t ackCode,
             }
         }
     }
-    logDebug<60>("Received %d of %d bytes [Timeout elapsed!]", buf_pos, len);
+    logDebug<60>("Received %d of %d bytes [Timeout elapsed!]", 
+                 static_cast<int32_t>(buf_pos), 
+                 static_cast<uint32_t>(len));
     return result_(false, value_changed);
 }
 
@@ -331,7 +333,7 @@ bool EmNextion::setVisible(const char* elementName,
     }
     logDebug<50>("visible: %s -> %s [%s]", 
                  elementName,
-                 visible,
+                 visible ? "TRUE" : "FALSE",
                  (res ? " [SUCCESS]" : " [FAIL]"));
     return res;
 }
@@ -352,9 +354,9 @@ bool EmNextion::setPicture(const char* pageName,
     if (sendSetCmd_(pageName, elementName, "pic", picId)) {
         res = ack_(ACK_CMD_SUCCEED);
     }
-    logDebug<50>("pic: %s -> %s [%s]", 
+    logDebug<50>("pic: %s -> %d [%s]", 
                  elementName,
-                 picId,
+                 static_cast<int>(picId),
                  (res ? " [SUCCESS]" : " [FAIL]"));
     return res;
 }
@@ -375,7 +377,7 @@ bool EmNextion::getPicture(const char* pageName,
     }
     logDebug<50>("pic: %s -> %d [%s]", 
                  elementName,
-                 picId,
+                 static_cast<int>(picId),
                  res ? " [SUCCESS]" : " [FAIL]");
     return res;
 }
@@ -391,7 +393,7 @@ bool EmNextion::click(const char* elementName,
     }
     logDebug<50>("click: %s -> %s [%s]", 
                  elementName,
-                 pressed,
+                 pressed ? "TRUE" : "FALSE",
                  (res ? " [SUCCESS]" : " [FAIL]"));
     return res;
 }
@@ -411,10 +413,10 @@ bool EmNextion::setColor_(const char* pageName,
     if (sendSetCmd_(pageName, elementName, colorCode, color565)) {
         res = ack_(ACK_CMD_SUCCEED);
     }
-    logDebug<50>("%s: %s -> %s [%s]", 
+    logDebug<50>("%s: %s -> %u [%s]", 
                  colorCode,
                  elementName,
-                 color565,
+                 static_cast<uint32_t>(color565),
                  (res ? " [SUCCESS]" : " [FAIL]"));
     return res;
 }
@@ -431,10 +433,10 @@ bool EmNextion::getColor_(const char* pageName,
             color565 = static_cast<uint16_t>(val);
         }
     }
-    logDebug<50>("%s: %s -> %s [%s]", 
+    logDebug<50>("%s: %s -> %u [%s]", 
                  colorCode,
                  elementName,
-                 color565,
+                 static_cast<uint32_t>(color565),
                  (res ? " [SUCCESS]" : " [FAIL]"));
     return res;
 }
