@@ -95,7 +95,7 @@ bool EmNextion::wakeup() {
         // NOTE: cannot use 'sendCmd_' since 'begin_' will fail if display is sleeping!
         sendCmdParam_("sleep=0", true);
         sendCmdEnd_();
-        tDelay(10);
+        tDelay(10, true);
         sendCmdParam_("bkcmd=3", true); // Get 'ack' char back from commands!
         sendCmdEnd_();
         if (ack_(ACK_CMD_SUCCEED, 500)) {

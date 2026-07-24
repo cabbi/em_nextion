@@ -125,7 +125,7 @@ bool EmNextionOtaUpdater::uploadPacket_(EmStream& client,
             // Wait for stream data
             streamTimeout.restart();
             while (!client.available() && !streamTimeout.isExpired(true)) {
-                tDelay(1);
+                tDelay(1, true);
             }
             // Got data from stream?
             if (!client.available()) {
