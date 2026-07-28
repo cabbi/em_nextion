@@ -15,6 +15,10 @@
 // The following classes have no virtual methods. 
 // This is to reduce the RAM footprint of each object instance.
 
+// The real number type for nextion objects
+using nexReal = float;
+
+
 // Nextion defined result codes
 enum EmNextionRet: uint8_t {
     ACK_CMD_SUCCEED = 0x01,
@@ -613,14 +617,14 @@ public:
         return res;
     }
 
-    double getValue() const {
-        double value = 0;
+    nexReal getValue() const {
+        nexReal value = 0;
         getValue(value);
         return value;
     }
 
-    EmGetValueResult getValue(double& value) const {
-        return getValue<double>(value);
+    EmGetValueResult getValue(nexReal& value) const {
+        return getValue<nexReal>(value);
     }
  
     template <class real_type>
@@ -630,10 +634,6 @@ public:
                                              iRound<real_type>(value*iPow10(m_decPlaces)));
     }
 
-    bool setValue(double value) const {
-        return setValue<double>(value);
-    }
-
 protected:
     const uint8_t m_decPlaces;
 };
@@ -641,7 +641,7 @@ protected:
 
 // A two labels number. 
 //
-// The float value is displayed on two different 'Number' nextion objects.
+// The real value is displayed on two different 'Number' nextion objects.
 template<EmNexPage& tPage>
 class EmNexDecimal: public EmNexColoredElement<tPage>
 {
@@ -654,9 +654,9 @@ public:
        m_decElementName(decElementName),
        m_decPlaces(decPlaces) {}
 
-    bool setValue(double value) {
+    bool setValue(nexReal value) {
         int32_t exp = iPow10(this->m_decPlaces);
-        int32_t dispValue = iRound(value*static_cast<double>(exp));
+        int32_t dispValue = iRound(value*static_cast<nexReal>(exp));
         return this->nex().setNumElementValue(this->pageName(), 
                                               this->name(), 
                                               iDiv(dispValue, exp)) &&
@@ -665,23 +665,14 @@ public:
                                               dispValue % exp);        
     }
 
-    double getValue() const {
-        double value = 0;
+    nexReal getValue() const {
+        nexReal value = 0;
         getValue(value);
         return value;
     }
 
-    EmGetValueResult getValue(float& value) const {
-        double val;
-        EmGetValueResult res = this->getValue(val);
-        if (EmGetValueResult::failed != res) {
-            value = static_cast<float>(val);
-        }
-        return res;
-    }
-
-    EmGetValueResult getValue(double& value) const { 
-        double prevValue = value;
+    EmGetValueResult getValue(nexReal& value) const { 
+        nexReal prevValue = value;
         EmGetValueResult res;
         int32_t intVal;
         res = this->nex().getNumElementValue(this->pageName(), 
@@ -697,7 +688,7 @@ public:
         if (res == EmGetValueResult::failed) {
             return EmGetValueResult::failed;
         }
-        value = intVal+(static_cast<double>(decVal)/pow(10, m_decPlaces));
+        value = intVal+(static_cast<nexReal>(decVal)/pow(10, m_decPlaces));
 
         return prevValue == value ? 
             EmGetValueResult::succeedEqualValue :

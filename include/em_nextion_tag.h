@@ -4,7 +4,6 @@
 #include "em_tag.h"
 #include "em_nextion.h"
 
-
 // The base EmTag nextion object used as base for other nextion tag classes.
 template<class nexElement, class T>
 class EmNexTagBase: public nexElement
@@ -25,6 +24,10 @@ public:
             value.setValue(val, true);
         }
         return res;
+    }
+
+    virtual bool setValue(T value) {
+        return nexElement::setValue(value);
     }
 
     virtual bool setValue(const EmTagValue& value) {
@@ -63,6 +66,10 @@ public:
             value.setValue(val, true);
         }
         return res;
+    }
+
+    virtual bool setValue(const char* value) {
+        return EmNexText<tPage>::setValue(value);
     }
 
     virtual bool setValue(const EmTagValue& value) {
@@ -108,6 +115,10 @@ public:
         return EmNexTagBase<EmNexInteger<tPage>, int32_t>::getValue(value);
     }
 
+    virtual bool setValue(int32_t value) override {
+        return EmNexTagBase<EmNexInteger<tPage>, int32_t>::setValue(value);
+    }
+
     virtual bool setValue(const EmTagValue& value) override {
         return EmNexTagBase<EmNexInteger<tPage>, int32_t>::setValue(value);
     }
@@ -126,14 +137,14 @@ public:
 
 // An real tag displayed on an 'Xfloat' nextion object.
 template<EmNexPage& tPage>
-class EmNexRealTag: public EmNexTagBase<EmNexReal<tPage>, double>,
+class EmNexRealTag: public EmNexTagBase<EmNexReal<tPage>, nexReal>,
                     public EmTagBase  {
 public:
     EmNexRealTag(const char* name,
                  uint8_t decPlaces,
                  EmSyncFlags syncFlags,
                  EmLogLevel logLevel=EmLogLevel::global)
-     : EmNexTagBase<EmNexReal<tPage>, double>(name, decPlaces, logLevel),
+     : EmNexTagBase<EmNexReal<tPage>, nexReal>(name, decPlaces, logLevel),
        EmTagBase(syncFlags) {}
 
      EmNexRealTag(const char* name,
@@ -146,15 +157,19 @@ public:
     }
 
     virtual const char* getId() const override {
-        return EmNexTagBase<EmNexReal<tPage>, double>::getId();
+        return EmNexTagBase<EmNexReal<tPage>, nexReal>::getId();
     }
 
     virtual EmGetValueResult getValue(EmTagValue& value) const override {
-        return EmNexTagBase<EmNexReal<tPage>, double>::getValue(value);
+        return EmNexTagBase<EmNexReal<tPage>, nexReal>::getValue(value);
+    }
+
+    virtual bool setValue(nexReal value) override {
+        return EmNexTagBase<EmNexReal<tPage>, nexReal>::setValue(value);
     }
 
     virtual bool setValue(const EmTagValue& value) override {
-        return EmNexTagBase<EmNexReal<tPage>, double>::setValue(value);
+        return EmNexTagBase<EmNexReal<tPage>, nexReal>::setValue(value);
     }
 };
 
@@ -171,9 +186,9 @@ public:
 
 // A two labels number. 
 //
-// The float value is displayed on two different 'Number' nextion objects.
+// The real numver value is displayed on two different 'Number' nextion objects.
 template<EmNexPage& tPage>
-class EmNexDecimalTag: public EmNexTagBase<EmNexDecimal<tPage>, double>,
+class EmNexDecimalTag: public EmNexTagBase<EmNexDecimal<tPage>, nexReal>,
                        public EmTagBase  {
 public:
     EmNexDecimalTag(const char* intElementName, // This will be the object name!
@@ -181,7 +196,7 @@ public:
                     uint8_t decPlaces,
                     EmSyncFlags syncFlags,
                     EmLogLevel logLevel=EmLogLevel::global)
-     : EmNexTagBase<EmNexDecimal<tPage>, double>(intElementName, decElementName, decPlaces, logLevel),
+     : EmNexTagBase<EmNexDecimal<tPage>, nexReal>(intElementName, decElementName, decPlaces, logLevel),
        EmTagBase(syncFlags) {}
 
      EmNexDecimalTag(const char* intElementName, // This will be the object name!
@@ -195,15 +210,19 @@ public:
     }
 
     virtual const char* getId() const override {
-        return EmNexTagBase<EmNexDecimal<tPage>, double>::getId();
+        return EmNexTagBase<EmNexDecimal<tPage>, nexReal>::getId();
     }
 
     virtual EmGetValueResult getValue(EmTagValue& value) const override {
-        return EmNexTagBase<EmNexDecimal<tPage>, double>::getValue(value);
+        return EmNexTagBase<EmNexDecimal<tPage>, nexReal>::getValue(value);
+    }
+
+    virtual bool setValue(nexReal value) override {
+        return EmNexTagBase<EmNexDecimal<tPage>, nexReal>::setValue(value);
     }
 
     virtual bool setValue(const EmTagValue& value) override {
-        return EmNexTagBase<EmNexDecimal<tPage>, double>::setValue(value);
+        return EmNexTagBase<EmNexDecimal<tPage>, nexReal>::setValue(value);
     }
 };
 
@@ -243,6 +262,10 @@ public:
 
     virtual EmGetValueResult getValue(EmTagValue& value) const override {
         return EmNexTagBase<EmNexCfgInteger<tPage>, int32_t>::getValue(value);
+    }
+
+    virtual bool setValue(int32_t value) override {
+        return EmNexTagBase<EmNexCfgInteger<tPage>, int32_t>::setValue(value);
     }
 
     virtual bool setValue(const EmTagValue& value) override {
