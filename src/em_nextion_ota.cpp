@@ -1,3 +1,4 @@
+#include "em_log.h"
 #include "em_string.h"
 #include "em_timeout.h"
 #include "em_nextion_ota.h"
@@ -9,7 +10,8 @@ uint32_t bytesToInt(const char* p) {
            ((uint32_t)p[3] << 24);
 }
 
-bool EmNextionOtaUpdater::update(EmStream& client, size_t contentLength) {
+bool EmNextionOtaUpdater::update(EmStreamRx& client, size_t contentLength) {
+    m_disp.logInfo(F("Initiating Nextion OTA update..."));
     tx_("connect");
     char buf[100];
     rx_(buf, 100);
@@ -31,11 +33,10 @@ bool EmNextionOtaUpdater::update(EmStream& client, size_t contentLength) {
     tx_(cmd.c_str());
     
     if (!rx_(R_ACK)) {
-        m_disp.logError(F("OTA: No response for 'whmi-wri' command!"));
-        // Lets try to send the first packet!
-        //return false;
+        m_disp.logError(F("OTA: No response for 'whmi-wri' command!"));        
+        //return false; // NOTE: we continue even if no response, just to try
+                        //       to get the display to the end of the procedure
     }
-
     // Start transmitting firmware packets
     bool skip = false;
     bool fillupMode = false;
@@ -72,8 +73,8 @@ bool EmNextionOtaUpdater::update(EmStream& client, size_t contentLength) {
 
 void EmNextionOtaUpdater::tx_(const char* cmd) {
     m_disp.m_serial.flush(true);
-    m_disp.m_serial.write(cmd, strlen(cmd));
-    m_disp.m_serial.write("\xFF\xFF\xFF", 3);
+    m_disp.m_serial.write(cmd);
+    m_disp.m_serial.write("\xFF\xFF\xFF");
 }    
 
 bool EmNextionOtaUpdater::rx_(char rxChar) {
@@ -110,17 +111,23 @@ bool EmNextionOtaUpdater::rx_(char* buf, size_t size) {
     return buf_pos == size;
 }
 
-bool EmNextionOtaUpdater::uploadPacket_(EmStream& client, 
+bool EmNextionOtaUpdater::uploadPacket_(EmStreamRx& client, 
                                         size_t size,
                                         bool& fillupMode, 
                                         bool skip) {
+    // The uart chunk used to optimize serial transmission.
+    const size_t chunkSize = 512;
+    char chunk[chunkSize];
     // A big timeout in case of slow streams (e.g. HTTP responses on weak wifi connection)
     EmTimeout streamTimeout(m_clientReadTimeout); 
-    while (size > 0) {
+    size_t sentBytes = 0;
+    while (sentBytes < size) {
         if (fillupMode) {
             // Filling up with zeros just to end up procedure and not get display stuck
-            // into the firmware update procedure where it does not react to any command.  
-            m_disp.m_serial.write(static_cast<uint8_t>(0));
+            // into the firmware update procedure where it does not react to any command.
+            size_t toSend = MIN(chunkSize, size - sentBytes);
+            memset(chunk, 0, toSend);
+            sentBytes += m_disp.m_serial.write(chunk, toSend);
         } else { 
             // Wait for stream data
             streamTimeout.restart();
@@ -128,18 +135,20 @@ bool EmNextionOtaUpdater::uploadPacket_(EmStream& client,
                 tDelay(1, true);
             }
             // Got data from stream?
-            if (!client.available()) {
+            size_t toSend = MIN(chunkSize, MIN(size - sentBytes, client.available()));
+            if (!toSend) {
                 m_disp.logError(F("OTA: stream data timeout, filling with zeros to end the procedure!"));
                 fillupMode = true;
             }
             // Read the stream byte
+            toSend = client.read((uint8_t*)chunk, toSend);
             if (skip) {
-                client.read();
+                sentBytes += toSend; // Skip the bytes, but count them as sent
             } else {
-                m_disp.m_serial.write(static_cast<uint8_t>(client.read()));
+                sentBytes += m_disp.m_serial.write(chunk, toSend);
             }  
         } 
-        size--;
+        m_disp.logInfo<100>("Sent %u bytes of %u", sentBytes, size);
     }
     return true;
 }
