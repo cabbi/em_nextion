@@ -5,9 +5,19 @@
 
 #include "em_defs.h"
 #include "em_log.h"
+#include "em_serial.h"
+#include "em_threading.h"
 #include "em_optional.h"
-#include "em_com_device.h"
-#include "em_sync_value.h"
+#include "em_value_sync.h"
+#include "em_tag.h"
+
+// NOTE:
+// The following classes have no virtual methods. 
+// This is to reduce the RAM footprint of each object instance.
+
+// The real number type for nextion objects
+using nexReal = float;
+
 
 // Nextion defined result codes
 enum EmNextionRet: uint8_t {
@@ -48,43 +58,101 @@ inline uint16_t toColor565(uint8_t red, uint8_t green, uint8_t blue) {
 }
 
 inline void fromColor565(uint16_t color565, uint8_t& red, uint8_t& green, uint8_t& blue) {
-    red = (color565 & 0xF800) >> 8;    // rrrrr... ........ -> rrrrr000
-    green = (color565 & 0x07E0) >> 3;  // .....ggg ggg..... -> gggggg00
-    blue = (color565 & 0x1F) << 3;     // ............bbbbb -> bbbbb000
+    red   = (color565 & 0xF800) >> 8; // rrrrr... ........ -> rrrrr000
+    green = (color565 & 0x07E0) >> 3; // .....ggg ggg..... -> gggggg00
+    blue  = (color565 & 0x001F) << 3; // ............bbbbb -> bbbbb000
 }
 
-// The main nextion display handling class
+// Forward declaration
+class EmNextionOtaUpdater;
+
+// The main nextion display handling class.
+// 
+// The 'serial' object must be an 'EmSerialStream' implementation like 'EmHardwareSerial'.
+// The instance 'begin' method will call the 'serial' object begin as well.
 class EmNextion: public EmLog {
+    friend class EmNextionOtaUpdater;
 public:
-    EmNextion(EmComSerial& serial, 
+    EmNextion(EmSerialStream& serial, 
               uint32_t timeoutMs, 
-              EmLogLevel logLevel=EmLogLevel::none);
+              const char* logContext="Nex", 
+              EmLogLevel logLevel=EmLogLevel::global) : 
+        EmLog(logContext, logLevel),
+        m_serial(serial),
+        m_timeoutMs(timeoutMs),
+        m_isInit(false) {}
+    
+    // Scan for the correct baudrate of the connected nextion display.
+#ifdef EM_HW_SERIAL_AVR
+    bool scanBaudrate(uint32_t& baud) const;
 
-    bool begin() const;
+    // Begins the nextion display communication.
+    // 
+    // If baud is set to zero (default) communication speed is 
+    // automatically determined by 'scanBaudrate'.
+    bool begin(uint32_t baud=0) const;
+#else
+    bool scanBaudrate(uint32_t& baud, int8_t rxPin=-1, int8_t txPin=-1) const;
 
+    // Begins the nextion display communication.
+    // 
+    // If baud is set to zero (default) communication speed is 
+    // automatically determined by 'scanBaudrate'.
+    bool begin(uint32_t baud=0, int8_t rxPin=-1, int8_t txPin=-1) const;
+#endif        
+
+
+    // Returns true if the display is initialized (i.e. awake and actively responding to commands).
     bool isInit() const { 
         return m_isInit;
     }
 
+    // Page handling methods
     bool isCurPage(uint8_t pageId) const;
     bool getCurPage(uint8_t& pageId) const;
     bool setCurPage(uint8_t pageId) const;
     bool setCurPage(const char* pageName) const;
 
+    // Get numeric element value.
     EmGetValueResult getNumElementValue(const char* pageName, 
                                         const char* elementName, 
                                         int32_t& val) const;
-    template<size_t len>
+
+    // Get text element value.
+    template<size_t max_str_len>
     EmGetValueResult getTextElementValue(const char* pageName, 
                                          const char* elementName, 
-                                         char* txt) const;
+                                         char* txt) const {
+        // Create a copy in case communication fails
+        // (i.e. some bytes might be modified by _recv method!)
+    #ifdef EM_MULTITHREAD
+        EmMutexLock lock(m_serialLock);
+    #endif
+        char dispTxt[max_str_len+1];
+        strncpy(dispTxt, txt, max_str_len);
+        EmGetValueResult res = EmGetValueResult::failed;
+        if (sendGetCmd_(pageName, elementName, "txt")) {
+            res = getString_(dispTxt, sizeof(dispTxt), elementName);    
+        }
+        // Copy the received text int user value
+        if (EmGetValueResult::failed != res) {
+            strcpy(txt, dispTxt);
+        }
+        return res;
+    }
 
+    // Set numeric element value.
     bool setNumElementValue(const char* pageName, 
                             const char* elementName, 
                             int32_t val) const;
+    
+    // Set text element value.
     bool setTextElementValue(const char* pageName, 
                              const char* elementName, 
                              const char* txt) const;
+
+    // Wakeup display in case it is in sleep mode
+    bool wakeup();
 
     // Set element visibility.
     //
@@ -123,6 +191,9 @@ public:
     bool setBkColor(const char* pageName, 
                     const char* elementName, 
                     uint16_t color565) const {
+    #ifdef EM_MULTITHREAD
+        EmMutexLock lock(m_serialLock);
+    #endif
         return setColor_(pageName, elementName, "bco", color565);
     }
 
@@ -143,6 +214,9 @@ public:
     bool getBkColor(const char* pageName, 
                     const char* elementName, 
                     uint16_t& color565) const {
+    #ifdef EM_MULTITHREAD
+        EmMutexLock lock(m_serialLock);
+    #endif
         return getColor_(pageName, elementName, "bco", color565);
     }
 
@@ -160,6 +234,9 @@ public:
     bool setFontColor(const char* pageName, 
                       const char* elementName, 
                       uint16_t color565) const {
+    #ifdef EM_MULTITHREAD
+        EmMutexLock lock(m_serialLock);
+    #endif
         return setColor_(pageName, elementName, "pco", color565);
     }
 
@@ -180,6 +257,9 @@ public:
     bool getFontColor(const char* pageName, 
                       const char* elementName, 
                       uint16_t& color565) const {
+    #ifdef EM_MULTITHREAD
+        EmMutexLock lock(m_serialLock);
+    #endif
         return getColor_(pageName, elementName, "pco", color565);
     }
 
@@ -196,6 +276,7 @@ public:
                bool pressed = true) const;               
 
 protected:
+    bool begin_() const;
     bool sendGetCmd_(const char* pageName, 
                      const char* elementName, 
                      const char* property) const;
@@ -214,13 +295,14 @@ protected:
 
 
     bool sendCmd_(const char* firstCmd, ...) const;
-    bool sendCmdParam_(const char* cmdParam) const;
+    bool sendCmdParam_(const char* cmdParam, bool flushTxRxBuffers=true) const;
     bool sendCmdEnd_() const;
-    bool ack_(uint8_t ackCode) const;
+    bool ack_(uint8_t ackCode, uint32_t timeoutMs=0) const;
     EmGetValueResult recv_(uint8_t ackCode, 
                            char* buf, 
                            uint8_t len, 
-                           bool isText=false) const;
+                           bool isText=false,
+                           uint32_t timeoutMs=0) const;
     EmGetValueResult result_(bool result, bool valueChanged) const;
     bool bResult_(bool result) const;
 
@@ -234,31 +316,47 @@ protected:
                    const char* colorCode, 
                    uint16_t& color565) const;
 private:
-    EmComSerial& m_serial;       
+    EmSerialStream& m_serial;       
     const uint32_t m_timeoutMs;
     mutable bool m_isInit;
+#ifdef EM_MULTITHREAD
+    mutable EmMutex m_serialLock;
+#endif
 };
 
+// The base nextion object class
 class EmNexObject: public EmLog {
 public:
     EmNexObject(const char* name,
-                EmLogLevel logLevel=EmLogLevel::none)
-     : EmLog("NexObj", logLevel),
-       m_name(name) {}
+                EmLogLevel logLevel=EmLogLevel::global)
+     : EmLog(name, logLevel)
+    #ifdef EM_NO_LOG
+     , m_name(name)
+    #endif
+    {}
 
-    const char* name() const { return m_name; }
+    const char* name() const {
+        #ifdef EM_NO_LOG
+        return m_name;
+        #else
+        return getContext();
+        #endif
+    };
 
 protected:
+#ifdef EM_NO_LOG
     const char* m_name;
+#endif
 };
 
+// The page object of a nextion page.
 class EmNexPage: public EmNexObject
 {
 public:
     EmNexPage(EmNextion& nex,
               const uint8_t id, 
               const char* name,
-              EmLogLevel logLevel=EmLogLevel::none)
+              EmLogLevel logLevel=EmLogLevel::global)
       : EmNexObject(name, logLevel),
         m_nex(nex),
         m_id(id)
@@ -285,12 +383,16 @@ protected:
     const uint8_t m_id;
 };
 
+// A general page UI element.
+//
+// This is the base class for many following objects, each belonging to a nextion page.
+// Page templete is to reduce RAM footprint.
 template<EmNexPage& tPage>
 class EmNexPageElement: public EmNexObject
 {
 public:
     EmNexPageElement(const char* name,
-                     EmLogLevel logLevel=EmLogLevel::none)
+                     EmLogLevel logLevel=EmLogLevel::global)
      : EmNexObject(name, logLevel) {}
 
     EmNextion& nex() const {
@@ -312,7 +414,7 @@ public:
     //  2. visibility attribute is reset if page is changed 
     //     or display recovers from screen saver
     bool setVisible(bool visible) const {
-        return nex().setVisible(tPage.id(), m_name, visible);
+        return nex().setVisible(tPage.id(), name(), visible);
     }
 
     // Simulate a 'Click' event.
@@ -321,35 +423,41 @@ public:
     //  1. element should be in current page
     //  2. if pressed = False a release event is sent
     bool click(bool pressed = true) const {
-        return nex().click(tPage.id(), m_name, pressed);
+        return nex().click(tPage.id(), name(), pressed);
     }
 };
 
+// An picture displayed on an 'Picture' nextion object.
+//
+// Use the 'setPicture' and 'getPicture' methods to set and get the nextion picture id.
 template<EmNexPage& tPage>
 class EmNexPicture: public EmNexPageElement<tPage>
 {
 public:
     EmNexPicture(const char* name,
-                 EmLogLevel logLevel=EmLogLevel::none)
+                 EmLogLevel logLevel=EmLogLevel::global)
      : EmNexPageElement<tPage>(name, logLevel){}
 
     // Set element picture (only for picture objects).
     bool setPicture(uint8_t picId) const {
-        return this->nex().SetPicture(tPage.name(), this->m_name, picId);
+        return this->nex().setPicture(tPage.name(), this->name(), picId);
     }
 
     // Get element picture (only for picture objects).
     bool getPicture(uint8_t& picId) const {
-        return this->nex().GetPicture(tPage.name(), this->m_name, picId);
+        return this->nex().getPicture(tPage.name(), this->name(), picId);
     }
 };
 
+// A general colored item. 
+//
+// This is the base class for many other nextion objects having font and background color properties.
 template<EmNexPage& tPage>
 class EmNexColoredElement: public EmNexPageElement<tPage>
 {
 public:
     EmNexColoredElement(const char* name,
-                        EmLogLevel logLevel=EmLogLevel::none)
+                        EmLogLevel logLevel=EmLogLevel::global)
      : EmNexPageElement<tPage>(name, logLevel){}
 
 
@@ -358,13 +466,13 @@ public:
                     uint8_t green,
                     uint8_t blue) const {
         return this->nex().setBkColor(tPage.name(), 
-                                      this->m_name, 
+                                      this->name(), 
                                       toColor565(red, green, blue));
     }
 
     bool setBkColor(uint16_t color565) const {
         return this->nex().setBkColor(tPage.name(), 
-                                      this->m_name, 
+                                      this->name(), 
                                       color565);
     }
 
@@ -373,13 +481,13 @@ public:
                     uint8_t& green,
                     uint8_t& blue) const {
         return this->nex().getBkColor(tPage.name(), 
-                                      this->m_name, 
+                                      this->name(), 
                                       red, green, blue);
     }
 
     bool getBkColor(uint16_t& color565) const {
         return this->nex().getBkColor(tPage.name(), 
-                                      this->m_name, 
+                                      this->name(), 
                                       color565);
     }
 
@@ -388,13 +496,13 @@ public:
                       uint8_t green,
                       uint8_t blue) const {
         return this->nex().setFontColor(tPage.name(), 
-                                        this->m_name, 
+                                        this->name(), 
                                         red, green, blue);
     }
 
     bool setFontColor(uint16_t color565) const {
         return this->nex().setFontColor(tPage.name(), 
-                                        this->m_name, 
+                                        this->name(), 
                                         color565);
     }
 
@@ -403,236 +511,184 @@ public:
                       uint8_t& green,
                       uint8_t& blue) const {
         return this->nex().getFontColor(tPage.name(), 
-                                        this->m_name, 
+                                        this->name(), 
                                         red, green, blue);
     }
 
     bool getFontColor(uint16_t& color565) const {
         return this->nex().getFontColor(tPage.name(), 
-                                        this->m_name, 
+                                        this->name(), 
                                         color565);
     }
 
 };
 
+// A text displayed on an 'Text' nextion object.
 template<EmNexPage& tPage>
 class EmNexText: public EmNexColoredElement<tPage>
 {
 public:
     EmNexText(const char* name,
-              EmLogLevel logLevel=EmLogLevel::none)
+              EmLogLevel logLevel=EmLogLevel::global)
      : EmNexColoredElement<tPage>(name, logLevel) {}
 
-    template<size_t len>
+    template<size_t max_str_len>
     EmGetValueResult getValue(char* value) const {
-        return this->nex().GetTextElementValue<len>(this->pageName(), this->m_name, value);
+        return this->nex().template getTextElementValue<max_str_len>(this->pageName(), this->name(), value);
     }
 
     bool setValue(const char* value) const {
-        return this->nex().setTextElementValue(this->pageName(), this->m_name, value);
+        return this->nex().setTextElementValue(this->pageName(), this->name(), value);
     }
 
-    template <uint16_t max_len>
+    template <uint16_t max_str_len>
     bool setValue(const char* format, ...) const {
-        char text[max_len+1];
+        char text[max_str_len+1];
         va_list args;
         va_start(args, format);     
-        vsnprintf(text, max_len+1, format, args);
+        vsnprintf(text, max_str_len+1, format, args);
         va_end(args);
-        return this->nex().setTextElementValue(this->pageName(), this->m_name, text);
+        return this->nex().setTextElementValue(this->pageName(), this->name(), text);
     }
 };
 
-// Use 'EmNexTextEx' class if you need an 'EmValue' object 
-template<EmNexPage& tPage>
-class EmNexTextEx: public EmNexText<tPage>,
-                   public EmValue<char*>
-{
-public:
-     EmNexTextEx(const char* name,
-                 EmLogLevel logLevel=EmLogLevel::none)
-     : EmNexText<tPage>(name, logLevel), 
-       EmValue<char*>() {}
 
-    virtual EmGetValueResult getValue(char* value) const override {
-        // NOTE:
-        //  Since 'GetValue' overrides a virtual method it can not 
-        //  be template based. 100 should be a good compromise.
-        //  To use exact len please use the templated 'getValue' method. 
-        return EmNexText<tPage>::getValue<100>(value);
-    }
-
-    virtual bool setValue(const char* value) override {
-        return EmNexText<tPage>::setValue(value);
-    }
-};
-
+// An integer number displayed on an 'Number' nextion object.
 template<EmNexPage& tPage>
 class EmNexInteger: public EmNexColoredElement<tPage>
 {
 public:
     EmNexInteger(const char* name,
-                 EmLogLevel logLevel=EmLogLevel::none)
+                 EmLogLevel logLevel=EmLogLevel::global)
      : EmNexColoredElement<tPage>(name, logLevel) {}
 
-    // Templated methods (not virtual)
-    template <class int_type>
-    EmGetValueResult getValue(int_type& value) const {
+    // Templated methods
+    template <class T>
+    EmGetValueResult getValue(T& value) const {
         int32_t val = static_cast<int32_t>(value);
         EmGetValueResult res = getValue(val);
         if (EmGetValueResult::failed != res) {
-            value = static_cast<int_type>(val);
+            value = static_cast<T>(val);
         }
         return res;
     }
 
+    int32_t getValue() const {
+        int32_t value = 0;
+        getValue(value);
+        return value;
+    }
+
     EmGetValueResult getValue(int32_t& value) const {
         return this->nex().getNumElementValue(this->pageName(), 
-                                              this->m_name, 
+                                              this->name(), 
                                               value);
     }
 
-    bool setValue(int32_t const value) const {
+    bool setValue(const int32_t& value) const {
         return this->nex().setNumElementValue(this->pageName(), 
-                                              this->m_name, 
+                                              this->name(), 
                                               value);
     }
 };
 
-// Use 'EmNexIntegerEx' class if you need an 'EmValue' object 
-template<EmNexPage& tPage>
-class EmNexIntegerEx: public EmNexInteger<tPage>,
-                      public EmValue<int32_t>
-{
-public:
-    EmNexIntegerEx(const char* name,
-                   EmLogLevel logLevel=EmLogLevel::none)
-     : EmNexInteger<tPage>(name, logLevel),
-       EmValue<int32_t>() {}
 
-    virtual EmGetValueResult getValue(int32_t& value) const override {
-        return EmNexInteger<tPage>::getValue(value);
-    }
-
-    virtual bool setValue(int32_t const value) override {
-        return EmNexInteger<tPage>::setValue(value);
-    }
-};
-
+// A floating point number displayed on a 'Xfloat' nextion object.
 template<EmNexPage& tPage>
 class EmNexReal: public EmNexColoredElement<tPage>
 {
 public:
     EmNexReal(const char* name,
               uint8_t decPlaces,
-              EmLogLevel logLevel=EmLogLevel::none)
+              EmLogLevel logLevel=EmLogLevel::global)
      : EmNexColoredElement<tPage>(name, logLevel),
        m_decPlaces(decPlaces) {}
 
-    // Templated methods (not virtual)
+    // Templated methods
     template <class real_type>
     EmGetValueResult getValue(real_type& value) const {
         int32_t val = iMolt<real_type>(value, iPow10(m_decPlaces));
-        EmGetValueResult res = this->nex().getNumElementValue(this->page().Name(), 
-                                                              this->m_name, 
+        EmGetValueResult res = this->nex().getNumElementValue(this->pageName(), 
+                                                              this->name(), 
                                                               val);
         if (EmGetValueResult::failed != res) {
             value = static_cast<real_type>(val)/pow(10, m_decPlaces);
         }
         return res;
     }
+
+    nexReal getValue() const {
+        nexReal value = 0;
+        getValue(value);
+        return value;
+    }
+
+    EmGetValueResult getValue(nexReal& value) const {
+        return getValue<nexReal>(value);
+    }
  
     template <class real_type>
     bool setValue(real_type const value) {
-        return this->nex().setNumElementValue(this->PageName(), 
-                                             this->m_name, 
+        return this->nex().setNumElementValue(this->pageName(), 
+                                             this->name(), 
                                              iRound<real_type>(value*iPow10(m_decPlaces)));
-    }
-
-    EmGetValueResult getValue(double& value) const {
-        return getValue<double>(value);
-    }
-
-    bool setValue(double const value) const {
-        return setValue<double>(value);
     }
 
 protected:
     const uint8_t m_decPlaces;
 };
 
-// Use 'EmNexRealEx' class if you need an 'EmValue' object 
-template<EmNexPage& tPage>
-class EmNexRealEx: public EmNexReal<tPage>,
-                   public EmValue<double>
-{
-public:
-    EmNexRealEx(const char* name,
-              uint8_t decPlaces,
-              EmLogLevel logLevel=EmLogLevel::none)
-     : EmNexReal<tPage>(name, logLevel),
-       EmValue<double>() {}
 
-    virtual EmGetValueResult getValue(double& value) const override {
-        return EmNexReal<tPage>::getValue(value);
-    }
-
-    virtual bool setValue(double const value) override {
-        return EmNexReal<tPage>::setValue(value);
-    }
-};
-
-// A two labels number
+// A two labels number. 
+//
+// The real value is displayed on two different 'Number' nextion objects.
 template<EmNexPage& tPage>
 class EmNexDecimal: public EmNexColoredElement<tPage>
 {
 public:
-    EmNexDecimal(const char* intElementName,
+    EmNexDecimal(const char* intElementName, // This will be the object name!
                  const char* decElementName,
                  uint8_t decPlaces,
-                 EmLogLevel logLevel=EmLogLevel::none)
+                 EmLogLevel logLevel=EmLogLevel::global)
      : EmNexColoredElement<tPage>(intElementName, logLevel),
        m_decElementName(decElementName),
        m_decPlaces(decPlaces) {}
 
-    bool setValue(double const value) {
+    bool setValue(nexReal value) {
         int32_t exp = iPow10(this->m_decPlaces);
-        int32_t dispValue = iRound(value*static_cast<double>(exp));
-        return this->nex().setNumElementValue(this->page().name(), 
-                                              this->m_name, 
+        int32_t dispValue = iRound(value*static_cast<nexReal>(exp));
+        return this->nex().setNumElementValue(this->pageName(), 
+                                              this->name(), 
                                               iDiv(dispValue, exp)) &&
-               this->nex().setNumElementValue(this->page().name(), 
+               this->nex().setNumElementValue(this->pageName(), 
                                               this->m_decElementName, 
                                               dispValue % exp);        
     }
 
-    EmGetValueResult getValue(float& value) const {
-        double val;
-        EmGetValueResult res = this->getValue(val);
-        if (EmGetValueResult::failed != res) {
-            value = static_cast<float>(val);
-        }
-        return res;
+    nexReal getValue() const {
+        nexReal value = 0;
+        getValue(value);
+        return value;
     }
 
-    EmGetValueResult getValue(double& value) const { 
-        double prevValue = value;
+    EmGetValueResult getValue(nexReal& value) const { 
+        nexReal prevValue = value;
         EmGetValueResult res;
         int32_t intVal;
-        res = this->nex().getNumElementValue(this->page().Name(), 
-                                             this->m_name, 
+        res = this->nex().getNumElementValue(this->pageName(), 
+                                             this->name(), 
                                              intVal);
         if (res == EmGetValueResult::failed) {
             return EmGetValueResult::failed;
         }
         int32_t decVal;
-        res = this->nex().getNumElementValue(this->page().Name(), 
+        res = this->nex().getNumElementValue(this->pageName(), 
                                              m_decElementName, 
                                              decVal);
         if (res == EmGetValueResult::failed) {
             return EmGetValueResult::failed;
         }
-        value = intVal+(static_cast<double>(decVal)/pow(10, m_decPlaces));
+        value = intVal+(static_cast<nexReal>(decVal)/pow(10, m_decPlaces));
 
         return prevValue == value ? 
             EmGetValueResult::succeedEqualValue :
@@ -645,7 +701,7 @@ public:
                     uint8_t green,
                     uint8_t blue) const {
         return this->nex().setBkColor(tPage.name(), 
-                                      this-> m_name, 
+                                      this-> name(), 
                                       toColor565(red, green, blue)) &&
                this->nex().setBkColor(tPage.name(), 
                                       m_decElementName, 
@@ -654,7 +710,7 @@ public:
 
     bool setBkColor(uint16_t color565) const {
         return this->nex().setBkColor(tPage.name(), 
-                                      this->m_name, 
+                                      this->name(), 
                                       color565) &&
                this->nex().setBkColor(tPage.name(), 
                                       m_decElementName, 
@@ -666,7 +722,7 @@ public:
                       uint8_t green,
                       uint8_t blue) const {
         return this->nex().setFontColor(tPage.name(), 
-                                        this->m_name, 
+                                        this->name(), 
                                         red, green, blue) &&
                this->nex().setFontColor(tPage.name(), 
                                         m_decElementName, 
@@ -675,7 +731,7 @@ public:
 
     bool setFontColor(uint16_t color565) const {
         return this->nex().setFontColor(tPage.name(), 
-                                        this->m_name, 
+                                        this->name(), 
                                         color565) &&
                this->nex().setFontColor(tPage.name(), 
                                         m_decElementName, 
@@ -687,44 +743,22 @@ protected:
     const uint8_t m_decPlaces;
 };
 
-// Use 'EmNexDecimalEx' class if you need an 'EmValue' object 
-template<EmNexPage& tPage>
-class EmNexDecimalEx: public EmNexDecimal<tPage>,
-                      public EmValue<double>
-{
-public:
-    EmNexDecimalEx(const char* intElementName,
-                   const char* decElementName,
-                   uint8_t decPlaces,
-                   EmLogLevel logLevel=EmLogLevel::none)
-     : EmNexDecimal<tPage>(intElementName, logLevel),
-       EmValue<double>() {}
 
-    virtual bool setValue(double const value) override {
-        return EmNexDecimal<tPage>::setValue(value);
-    }
-
-    virtual EmGetValueResult getValue(double& value) const override { 
-        return EmNexDecimal<tPage>::getValue(value);
-    }
-};
-
-
-// TODO: handle uninitialized elements on startup (i.e. alternatives to 'dispInitialValue' parameter)
-//       This should be done in case the display powers off an on while controlle is still running.
-//       If this happens configuration values need to be re-initialized to the display.
-
-
-// Configuration element for integer values
+// Configuration element for integer values.
 //
 // This class is used to handle configuration elements on the Nextion display.
 // A configuration element should be initialized first (i.e. value sent to the display element)
 // before reading it.
-template<EmNexPage& tPage>
+//
+// TODO: handle uninitialized elements on startup (i.e. alternatives to 'dispInitialValue' parameter)
+//       This should be done in case the display powers off an on while controller is still running.
+//       If this happens configuration values need to be re-initialized to the display.
+template<EmNexPage& tPage, typename ValueType=int32_t>
 class EmNexCfgInteger: public EmNexInteger<tPage> {
 public: 
-    EmNexCfgInteger(const char* name)
-     : EmNexInteger<tPage>(name),
+    EmNexCfgInteger(const char* name,
+                    EmLogLevel logLevel=EmLogLevel::global)
+     : EmNexInteger<tPage>(name, logLevel),
        m_isInitialized(false) {}
 
     
@@ -736,10 +770,11 @@ public:
     //  (i.e. if display value is greater than maxValue, maxValue is assigned to 'value').
     // 'dispInitialValue' is the optional initial value of the display element on power on
     //  (i.e. if the display value is equal to 'dispInitialValue' then this element is considered uninitialized).
-    bool updateValue(EmValue<int16_t>& value, 
-                     EmOptional<int16_t> minValue = emUndefined,
-                     EmOptional<int16_t> maxValue = emUndefined,
-                     EmOptional<int16_t> dispInitialValue = emUndefined) {
+    template<class T>
+    bool updateValue(T& value, 
+                     EmOptional<int32_t> minValue = emUndefined,
+                     EmOptional<int32_t> maxValue = emUndefined,
+                     EmOptional<int32_t> dispInitialValue = emUndefined) {
         // Set or get value ONLY if not on that page!
         if (tPage.isCurrent()) {
             return false;
@@ -747,9 +782,9 @@ public:
         // Value already set the first time?
         if (m_isInitialized) {
             // Get value from display
-            int16_t dispValue = 0;
-            if (EmGetValueResult::failed != EmNexInteger<tPage>::getValue(dispValue)) {
-                if (dispInitialValue.hasValue() && dispInitialValue.value() == dispValue) {
+            ValueType dispValue;
+            if (getValue_(dispValue)) {
+                if (dispInitialValue.hasValue() && dispValue == dispInitialValue.value()) {
                     // Somehow variable got reset (display power off?)
                     m_isInitialized = false;
                 } else {
@@ -765,9 +800,14 @@ public:
         }
         // Need to set the value?
         if (!isInitialized()) {
-            int16_t dispValue = 0;
+            ValueType dispValue;
+            // NOTE: if you get a compilation error here it is most probably have to:
+            //        - explicitly define the type of T (i.e. the 'value')
+            //          (e.g.  myCfgObj.updateValue<ValueClass>(value);)
+            //        - your T class is missing the 'getValue' method definition of
+            //          the 'EmValue' class (i.e. virtual EmGetValueResult getValue(<your T class>& value) const)
             if (EmGetValueResult::failed != value.getValue(dispValue)) {
-                m_isInitialized = EmNexInteger<tPage>::setValue(dispValue);
+                m_isInitialized = setValue_(dispValue);
             }
             return m_isInitialized;
         } 
@@ -784,29 +824,39 @@ public:
         m_isInitialized = false;
     }
 
-private:
+protected:
+    bool getValue_(int16_t& value) {
+        return EmNexInteger<tPage>::getValue(value) != EmGetValueResult::failed;
+    }
+
+    bool getValue_(int32_t& value) {
+        return EmNexInteger<tPage>::getValue(value) != EmGetValueResult::failed;
+    }
+
+    bool setValue_(int32_t value) {
+        return EmNexInteger<tPage>::setValue(value);
+    }
+
+#ifdef EM_STD_LIB // Need standard library 
+    bool getValue_(EmTagValue& value) {
+        int32_t dispValue = value.isType(EmTagValueType::vt_integer) ? value.asInteger() : 0;
+        EmGetValueResult res = EmNexInteger<tPage>::getValue(dispValue);
+        if (EmGetValueResult::succeedNotEqualValue == res) {
+            return value.setValue(dispValue, false);
+        }
+        return EmGetValueResult::failed != res;
+    }
+
+    bool setValue_(EmTagValue value) {
+        if (value.isNotType(EmTagValueType::vt_integer)) {
+            return false;
+        }
+        return EmNexInteger<tPage>::setValue(value.asInteger());
+    }
+#endif // EM_STD_LIB
+
+    // Member vars
     bool m_isInitialized;   
 };
-
-template<size_t len>
-inline EmGetValueResult EmNextion::getTextElementValue(
-    const char* pageName, 
-    const char* elementName, 
-    char* txt) const
-{
-    // Create a copy in case communication fails
-    // (i.e. some bytes might be modified by _recv method!)
-    char dispTxt[len+1];
-    strncpy(dispTxt, txt, len);
-    EmGetValueResult res = EmGetValueResult::failed;
-    if (sendGetCmd_(pageName, elementName, "txt")) {
-        res = getString_(dispTxt, sizeof(dispTxt), elementName);    
-    }
-    // Copy the received text int user value
-    if (EmGetValueResult::failed != res) {
-        strcpy(txt, dispTxt);
-    }
-    return res;
-}
 
 #endif // __EM_NEXTION__
