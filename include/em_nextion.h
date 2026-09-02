@@ -839,7 +839,7 @@ protected:
 
 #ifdef EM_STD_LIB // Need standard library 
     bool getValue_(EmTagValue& value) {
-        int32_t dispValue = value.isType(EmTagValueType::vt_integer) ? value.asInteger() : 0;
+        int32_t dispValue = value.isSameType(EmTagValueType::vt_int) ? value.asInt() : 0;
         EmGetValueResult res = EmNexInteger<tPage>::getValue(dispValue);
         if (EmGetValueResult::succeedNotEqualValue == res) {
             return value.setValue(dispValue, false);
@@ -848,10 +848,10 @@ protected:
     }
 
     bool setValue_(EmTagValue value) {
-        if (value.isNotType(EmTagValueType::vt_integer)) {
-            return false;
+        if (value.isSameType(EmTagValueType::vt_int)) {
+            return EmNexInteger<tPage>::setValue(value.asInt());
         }
-        return EmNexInteger<tPage>::setValue(value.asInteger());
+        return false;
     }
 #endif // EM_STD_LIB
 

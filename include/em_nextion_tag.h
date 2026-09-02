@@ -63,7 +63,7 @@ public:
         char val[max_str_len+1];
         EmGetValueResult res = EmNexText<tPage>::template getValue<max_str_len>(val);
         if (EmGetValueResult::failed != res) {
-            value.setValue(val, true);
+            value.setString(val);
         }
         return res;
     }
