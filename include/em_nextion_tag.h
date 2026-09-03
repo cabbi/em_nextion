@@ -186,7 +186,7 @@ public:
 
 // A two labels number. 
 //
-// The real numver value is displayed on two different 'Number' nextion objects.
+// The real number value is displayed on two different 'Number' nextion objects.
 template<EmNexPage& tPage>
 class EmNexDecimalTag: public EmNexTagBase<EmNexDecimal<tPage>, nexReal>,
                        public EmTagBase  {
