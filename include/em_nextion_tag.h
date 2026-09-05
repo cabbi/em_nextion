@@ -31,7 +31,20 @@ public:
     }
 
     virtual bool setValue(const EmTagValue& value) {
-        return nexElement::setValue(value.as<T>());
+        switch (value.getType()) {
+            case EmTagValueType::vt_bool:
+                return nexElement::setValue(value.asBool());
+            case EmTagValueType::vt_int:
+                return nexElement::setValue(value.asInt());
+            case EmTagValueType::vt_uint:
+                return nexElement::setValue(value.asUInt());
+            case EmTagValueType::vt_real:
+                return nexElement::setValue(value.asReal());    
+            case EmTagValueType::vt_epoch:
+                return false; //TODO: nexElement::setValue(value.asEpoch());            
+            default:
+                return false;
+        }
     }
 };
 
@@ -59,6 +72,7 @@ public:
         return EmNexText<tPage>::name();
     }
 
+    /*
     virtual EmGetValueResult getValue(EmTagValue& value) const {
         char val[max_str_len+1];
         EmGetValueResult res = EmNexText<tPage>::template getValue<max_str_len>(val);
@@ -68,12 +82,13 @@ public:
         return res;
     }
 
-    virtual bool setValue(const char* value) {
-        return EmNexText<tPage>::setValue(value);
-    }
-
     virtual bool setValue(const EmTagValue& value) {
         return EmNexText<tPage>::setValue(value.asString());
+    }
+    */
+
+    virtual bool setValue(const char* value) {
+        return EmNexText<tPage>::setValue(value);
     }
 };
 

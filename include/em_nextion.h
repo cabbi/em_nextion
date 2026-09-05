@@ -801,9 +801,9 @@ public:
         // Need to set the value?
         if (!isInitialized()) {
             ValueType dispValue;
-            // NOTE: if you get a compilation error here it is most probably have to:
-            //        - explicitly define the type of T (i.e. the 'value')
-            //          (e.g.  myCfgObj.updateValue<ValueClass>(value);)
+            // NOTE: if you get a compilation error here it is most probably because:
+            //        - you have to explicitly define the type of T (i.e. the 'value')
+            //          (e.g.  myCfgObj.updateValue(static_cast<ValueType>(value));
             //        - your T class is missing the 'getValue' method definition of
             //          the 'EmValue' class (i.e. virtual EmGetValueResult getValue(<your T class>& value) const)
             if (EmGetValueResult::failed != value.getValue(dispValue)) {
