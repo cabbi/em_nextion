@@ -18,6 +18,24 @@
 // The real number type for nextion objects
 using nexReal = float;
 
+// Nextion defined result codes
+enum EmNextionStatus: uint8_t {
+    Disconnected    = 0, // Display is not responding (i.e. might be powered off or not connected)
+    RootMode        = 1, // Display is in root mode (i.e. no application is running). This might be due to an OTA failure.
+    ApplicationMode = 2  // Display is connected and running an application (i.e normal status)
+};
+
+inline const char* displayStatusToText(EmNextionStatus status) {
+    switch (status) {
+        case EmNextionStatus::Disconnected:
+            return "Disconnected";
+        case EmNextionStatus::RootMode:
+            return "RootMode";
+        case EmNextionStatus::ApplicationMode:
+            return "ApplicationMode";
+    }
+    return "<undefined>";
+} 
 
 // Nextion defined result codes
 enum EmNextionRet: uint8_t {
@@ -82,25 +100,25 @@ public:
         m_timeoutMs(timeoutMs),
         m_isInit(false) {}
     
-    // Scan for the correct baudrate of the connected nextion display.
+    // Begins the nextion display communication.
+    // 
+    // If baud is set to zero (default) communication speed is automatically determined by 'scanBaudRate'.
+    // If baud is set to 0, you can set a preferred baudrate for the auto scanning (see 'scanBaudRate').
 #ifdef EM_HW_SERIAL_AVR
-    bool scanBaudrate(uint32_t& baud) const;
-
-    // Begins the nextion display communication.
-    // 
-    // If baud is set to zero (default) communication speed is 
-    // automatically determined by 'scanBaudrate'.
-    bool begin(uint32_t baud=0) const;
+    bool begin(uint32_t baud=0, uint32_t scanPreferredBaud=0) const;
 #else
-    bool scanBaudrate(uint32_t& baud, int8_t rxPin=-1, int8_t txPin=-1) const;
-
-    // Begins the nextion display communication.
-    // 
-    // If baud is set to zero (default) communication speed is 
-    // automatically determined by 'scanBaudrate'.
-    bool begin(uint32_t baud=0, int8_t rxPin=-1, int8_t txPin=-1) const;
+    bool begin(uint32_t baud=0, int8_t rxPin=-1, int8_t txPin=-1, uint32_t scanPreferredBaud=0) const;
 #endif        
 
+    // Scan for the correct baudrate of the connected nextion display.
+    // If preferredBaud != 0 then the scan will start with that baud rate.
+    // NOTE: 
+    // this method should be called after begin and, if succeeded, will set the found serial
+    // baudrate of the current serial connection to the display.
+    bool scanBaudRate(uint32_t preferredBaud=0) const;
+
+    // Returns the current baud rate or 0 if serial is not initialized
+    uint32_t getBaudRate() const;
 
     // Returns true if the display is initialized (i.e. awake and actively responding to commands).
     bool isInit() const { 
@@ -153,6 +171,9 @@ public:
 
     // Wakeup display in case it is in sleep mode
     bool wakeup();
+
+    // Get the current display status
+    EmNextionStatus getStatus();
 
     // Set element visibility.
     //

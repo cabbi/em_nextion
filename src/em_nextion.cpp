@@ -5,18 +5,16 @@
 #include "em_timeout.h"
 #include "em_nextion.h"
 
-#ifdef EM_HW_SERIAL_AVR
-bool EmNextion::scanBaudrate(uint32_t& baud) const {
-#else
-bool EmNextion::scanBaudrate(uint32_t& baud, int8_t rxPin, int8_t txPin) const {
-#endif        
+bool EmNextion::scanBaudRate(uint32_t preferredBaud) const {
     // This procedure follows the official Nextion recommendations at page:
     // https://nextion.tech/2017/12/08/nextion-hmi-upload-protocol-v1-1/
 #ifdef EM_MULTITHREAD
     EmMutexLock lock(m_serialLock);
 #endif
-    baud = 0;
-    uint32_t bauds[] = {921600, 512000, 500000, 460800, 256000, 250000, 230400, 192000, 
+    if (!m_serial.isInitialized()) {
+        return false;
+    }
+    uint32_t bauds[] = {preferredBaud, 921600, 512000, 500000, 460800, 256000, 250000, 230400, 192000, 
                         128000, 115200, 74880, 57600, 38400, 31250, 19200, 9600, 4800, 2400};
     const char msg[] = "DRAKJHSUYDGBNCJHGJKSHBDN" 
                        "\xFF\xFF\xFF" 
@@ -24,31 +22,21 @@ bool EmNextion::scanBaudrate(uint32_t& baud, int8_t rxPin, int8_t txPin) const {
                        "\xFF\xFF\xFF\xFF\xFF" 
                        "connect" 
                        "\xFF\xFF\xFF";
-    for (size_t i=0; i<sizeof(bauds)/sizeof(bauds[0]); i++) {        
-        uint32_t testBaud = bauds[i];    
-    #ifdef ARDUINO
-        #ifdef EM_HW_SERIAL_AVR
-        m_serial.begin(testBaud, SERIAL_8N1);
-        #else
-        m_serial.begin(testBaud, SERIAL_8N1, rxPin, txPin);
-        #endif        
-    #elif ESP_PLATFORM
-        m_serial.begin(testBaud, rxPin, txPin);
-    #else
-        #error "Unsupported platform!"
-    #endif        
-        logDebug<30>("scan at baud: %d", testBaud);
+    size_t startIndex = preferredBaud != 0 ? 0 : 1;
+    for (size_t i=startIndex; i<sizeof(bauds)/sizeof(bauds[0]); i++) {    
+        uint32_t currentBaud = bauds[i];    
+        logInfo<100>("Scanning display at %d baud...", currentBaud);    
+        m_serial.setBaudRate(currentBaud);
         m_serial.write(msg, sizeof(msg)-1);
         EmStringM res;
         if (recv_('c', res.buffer(), res.capacity(), true, 100) != EmGetValueResult::failed &&
             res.startsWith("omok")) {
-            baud = testBaud;
             return true;
         }
         // Drain any remaining bytes during the suggested timeout between two attempts
-        EmTimeout timeout((1000000UL/testBaud) + 30);
+        EmTimeout timeout((1000000UL/currentBaud) + 30);
         while (!timeout.isExpired()) {
-            while (m_serial.available()) {
+            while (m_serial.available()>0) {
                 m_serial.read();
             }
         }
@@ -57,24 +45,28 @@ bool EmNextion::scanBaudrate(uint32_t& baud, int8_t rxPin, int8_t txPin) const {
 }
 
 #ifdef EM_HW_SERIAL_AVR
-bool EmNextion::begin(uint32_t baud) const {
-    if (0 == baud && !scanBaudrate(baud)) {
-        return false;
-    }
-    m_serial.begin(static_cast<unsigned long>(baud), SERIAL_8N1);
+bool EmNextion::begin(uint32_t baud, uint32_t scanPreferredBaud) const {
 #else
-bool EmNextion::begin(uint32_t baud, int8_t rxPin, int8_t txPin) const {
-    if (0 == baud && !scanBaudrate(baud)) {
-        return false;
-    }
+bool EmNextion::begin(uint32_t baud, int8_t rxPin, int8_t txPin, uint32_t scanPreferredBaud) const {
 #endif        
-#ifdef ARDUINO
+    bool doScan = false;
+    if (0 == baud ) {
+        // Set baud to a "dummy" value to initialize serial port
+        baud = scanPreferredBaud != 0 ? scanPreferredBaud : 9600;
+        doScan = true;
+    }
+#ifdef EM_HW_SERIAL_AVR
+    m_serial.begin(static_cast<unsigned long>(baud), SERIAL_8N1);
+#elif ARDUINO
     m_serial.begin(static_cast<unsigned long>(baud), SERIAL_8N1, rxPin, txPin);
 #elif ESP_PLATFORM
     m_serial.begin(static_cast<unsigned long>(baud), rxPin, txPin);
 #else
     #error "Unsupported platform!"
 #endif        
+    if (doScan) {
+        return scanBaudRate(scanPreferredBaud);
+    }
     return begin_();
 }
 
@@ -84,6 +76,16 @@ bool EmNextion::begin_() const {
     sendCmdEnd_();
     m_isInit = ack_(ACK_CMD_SUCCEED);
     return m_isInit;
+}
+
+uint32_t EmNextion::getBaudRate() const {
+#ifdef EM_MULTITHREAD
+    EmMutexLock lock(m_serialLock);
+#endif
+    if (m_serial.isInitialized()) {
+        return m_serial.getBaudRate();
+    }
+    return 0;
 }
 
 bool EmNextion::wakeup() {
@@ -103,6 +105,31 @@ bool EmNextion::wakeup() {
         }
     }
     return false;
+}
+
+EmNextionStatus EmNextion::getStatus() {
+#ifdef EM_MULTITHREAD
+    EmMutexLock lock(m_serialLock);
+#endif
+    // Try multiple times 
+    for (uint8_t i=0; i<3; i++) {
+        // TODO: find a more robust way than this (if any!)
+        // Get the active page, in root mode we get 0xFF 0xFF
+        sendCmdParam_("get dp", true);
+        sendCmdEnd_();
+        tDelay(10, true);
+        char resp[10];
+        if (m_serial.readBytes(resp, 18, 200) > 5) {
+            m_serial.flushRxBuffer();
+            if (resp[0] == 0x71) {
+                if (resp[1] == 0xFF && resp[2] == 0xFF) {
+                    return EmNextionStatus::RootMode;
+                }
+                return EmNextionStatus::ApplicationMode;
+            }
+        }
+    }
+    return EmNextionStatus::Disconnected;
 }
 
 bool EmNextion::sendCmd_(const char* firstCmd, ...) const
@@ -152,7 +179,7 @@ EmGetValueResult EmNextion::recv_(uint8_t ackCode,
     uint8_t buf_pos=0;
     EmTimeout rxTimeout(timeoutMs ? timeoutMs : m_timeoutMs);
     while (!rxTimeout.isExpired(false)) {
-        while (m_serial.available()) {
+        while (m_serial.available() > 0) {
             uint8_t c = static_cast<uint8_t>(m_serial.read());
             // Still waiting for ack code?
             if (!got_ackCode) {

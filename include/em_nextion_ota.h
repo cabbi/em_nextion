@@ -7,6 +7,8 @@
 #include "em_ota_updater.h"
 
 // Nextion OTA updater class providing over-the-air updates for Nextion displays.
+// You can force a OTA baud rate by setting the 'otaBaudRate' parameter.
+// If otaBaudRate = 0 then the current display baud rate is taken.  
 //
 // This uses the 'whmi-wri' command to upload a new firmware to the display as described 
 // in the official Nextion Instruction Set page.
@@ -22,8 +24,10 @@
 class EmNextionOtaUpdater : public EmOtaUpdater {
 public:
     EmNextionOtaUpdater(EmNextion& disp,
+                        int otaBaudRate=0,
                         EmDuration clientReadTimeout = EmDuration(3000))
      : m_disp(disp),
+       m_otaBaudRate(otaBaudRate!=0 ? otaBaudRate : m_disp.m_serial.getBaudRate()),
        m_clientReadTimeout(clientReadTimeout) {}
 
     virtual bool update(EmStreamRx& client, size_t contentLength) override;
@@ -39,6 +43,7 @@ protected:
 
     // Member vars
     EmNextion& m_disp;
+    int m_otaBaudRate;
     EmDuration m_clientReadTimeout;
 };
 

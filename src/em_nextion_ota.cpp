@@ -12,14 +12,15 @@ uint32_t bytesToInt(const char* p) {
 
 bool EmNextionOtaUpdater::update(EmStreamRx& client, size_t contentLength) {
     m_disp.logInfo(F("Initiating Nextion OTA update..."));
+    // Send a connect command
     tx_("connect");
     char buf[100];
     rx_(buf, 100);
-    // Wakeup display before sending firmware    
-    if (!m_disp.wakeup()) {
-        m_disp.logError(F("OTA: Failed to initiate OTA update"));
-        return false;
-    }
+
+    // If display is running an application wake it up
+    // NOTE: we do not check result since display in root mode will not respond
+    m_disp.wakeup();
+
 #ifdef EM_MULTITHREAD
     EmMutexLock lock(m_disp.m_serialLock);
 #endif
@@ -29,7 +30,7 @@ bool EmNextionOtaUpdater::update(EmStreamRx& client, size_t contentLength) {
     // Send 'whmi-wri' command
     char rxBuf[5];
     EmStringM cmd;
-    cmd.format("whmi-wri %u,%u,1", contentLength, m_disp.m_serial.baudRate());
+    cmd.format("whmi-wri %u,%u,1", contentLength, m_otaBaudRate);
     tx_(cmd.c_str());
     
     if (!rx_(R_ACK)) {
@@ -38,37 +39,46 @@ bool EmNextionOtaUpdater::update(EmStreamRx& client, size_t contentLength) {
                         //       to get the display to the end of the procedure
     }
     // Start transmitting firmware packets
-    bool skip = false;
     bool fillupMode = false;
-    size_t sentBytes = 0;
-    size_t toSend = MIN(PACKET_SIZE, contentLength);
-    while (sentBytes < contentLength) {
-        // Send next packet
-        if (!uploadPacket_(client, toSend, fillupMode, skip)) {
-            return false;
-        }
-        sentBytes += toSend;
-        // Read response
-        if (!rx_(rxBuf, 1)) {
-            m_disp.logError(F("OTA: No response for sent packet!"));
-            return false;
-        }
-        skip = rxBuf[0] == R_SKIP;
-        if (skip) {
-            if (!rx_(rxBuf, 4)) {
-                m_disp.logError(F("OTA: No skip size received!"));
+    { // Start a OTA baud rate session
+        EmSerialBaudSession baudSession(m_disp.m_serial, m_otaBaudRate);
+        bool skip = false;
+        size_t sentBytes = 0;
+        size_t toSend = MIN(PACKET_SIZE, contentLength);
+        while (sentBytes < contentLength) {
+            // Send next packet
+            if (!uploadPacket_(client, toSend, fillupMode, skip)) {
                 return false;
             }
-            toSend = MIN(bytesToInt(rxBuf), contentLength - sentBytes);
-        } else 
-        if (rxBuf[0] == R_ACK) {
-            toSend = MIN(PACKET_SIZE, contentLength - sentBytes);
-        } else {
-            m_disp.logError(F("OTA: Unexpected response!"));
-            return false;
+            sentBytes += toSend;
+            // Read response
+            if (!rx_(rxBuf, 1)) {
+                m_disp.logError(F("OTA: No response for sent packet!"));
+                return false;
+            }
+            skip = rxBuf[0] == R_SKIP;
+            if (skip) {
+                if (!rx_(rxBuf, 4)) {
+                    m_disp.logError(F("OTA: No skip size received!"));
+                    return false;
+                }
+                toSend = MIN(bytesToInt(rxBuf), contentLength - sentBytes);
+            } else 
+            if (rxBuf[0] == R_ACK) {
+                toSend = MIN(PACKET_SIZE, contentLength - sentBytes);
+            } else {
+                m_disp.logError(F("OTA: Unexpected response!"));
+                return false;
+            }
         }
+    } // End the OTA baud rate session
+    // Do a new scan since the new display firmware might have a different baud rate
+    bool success = !fillupMode;
+    if (success) {
+        uint32_t prefBaud = m_disp.getBaudRate(); 
+        m_disp.scanBaudRate(prefBaud);
     }
-    return !fillupMode;
+    return success;
 }
 
 void EmNextionOtaUpdater::tx_(const char* cmd) {
