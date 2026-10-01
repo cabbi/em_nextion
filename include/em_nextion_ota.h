@@ -36,10 +36,10 @@ protected:
     void tx_(const char* cmd);
     bool rx_(char* buf, size_t maxSize);
     bool rx_(char rxChar);
-    bool uploadPacket_(EmStreamRx& client, 
-                       size_t size, 
-                       bool& fillupMode,
-                       bool skip);
+    size_t uploadPacket_(EmStreamRx& client, 
+                         size_t size, 
+                         bool& fillupMode,
+                         bool skip);
 
     // Member vars
     EmNextion& m_disp;

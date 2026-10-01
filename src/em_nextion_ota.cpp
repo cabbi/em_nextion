@@ -21,62 +21,69 @@ bool EmNextionOtaUpdater::update(EmStreamRx& client, size_t contentLength) {
     // NOTE: we do not check result since display in root mode will not respond
     m_disp.wakeup();
 
-#ifdef EM_MULTITHREAD
-    EmMutexLock lock(m_disp.m_serialLock);
-#endif
-    #define R_ACK 0x05
-    #define R_SKIP 0x08
-    #define PACKET_SIZE 4096
-    // Send 'whmi-wri' command
-    char rxBuf[5];
-    EmStringM cmd;
-    cmd.format("whmi-wri %u,%u,1", contentLength, m_otaBaudRate);
-    tx_(cmd.c_str());
-    
-    if (!rx_(R_ACK)) {
-        m_disp.logError(F("OTA: No response for 'whmi-wri' command!"));        
-        //return false; // NOTE: we continue even if no response, just to try
-                        //       to get the display to the end of the procedure
-    }
-    // Start transmitting firmware packets
     bool fillupMode = false;
-    { // Start a OTA baud rate session
-        EmSerialBaudSession baudSession(m_disp.m_serial, m_otaBaudRate);
-        bool skip = false;
-        size_t sentBytes = 0;
-        size_t toSend = MIN(PACKET_SIZE, contentLength);
-        while (sentBytes < contentLength) {
-            // Send next packet
-            if (!uploadPacket_(client, toSend, fillupMode, skip)) {
-                return false;
-            }
-            sentBytes += toSend;
-            // Read response
-            if (!rx_(rxBuf, 1)) {
-                m_disp.logError(F("OTA: No response for sent packet!"));
-                return false;
-            }
-            skip = rxBuf[0] == R_SKIP;
-            if (skip) {
-                if (!rx_(rxBuf, 4)) {
-                    m_disp.logError(F("OTA: No skip size received!"));
+    { // Start the display serial lock session
+    #ifdef EM_MULTITHREAD
+        EmMutexLock lock(m_disp.m_serialLock);
+    #endif
+        #define R_ACK 0x05
+        #define R_SKIP 0x08
+        #define PACKET_SIZE 4096
+        // Send 'whmi-wri' command
+        char rxBuf[5];
+        EmStringM cmd;
+        cmd.format("whmi-wri %u,%u,1", contentLength, m_otaBaudRate);
+        tx_(cmd.c_str());
+        
+        if (!rx_(R_ACK)) {
+            m_disp.logError(F("OTA: No response for 'whmi-wri' command!"));        
+            //return false; // NOTE: we continue even if no response, just to try
+                            //       to get the display to the end of the procedure
+        }
+        // Start transmitting firmware packets
+        { // Start a OTA baud rate session
+            EmSerialBaudSession baudSession(m_disp.m_serial, m_otaBaudRate);
+            bool skip = false;
+            size_t sentBytes = 0;
+            size_t toSend = MIN(PACKET_SIZE, contentLength);
+            while (sentBytes < contentLength) {
+                // Send next packet
+                if (uploadPacket_(client, toSend, fillupMode, skip) < toSend) {
                     return false;
                 }
-                toSend = MIN(bytesToInt(rxBuf), contentLength - sentBytes);
-            } else 
-            if (rxBuf[0] == R_ACK) {
-                toSend = MIN(PACKET_SIZE, contentLength - sentBytes);
-            } else {
-                m_disp.logError(F("OTA: Unexpected response!"));
-                return false;
+                tDelay(1, true); // avoid task watchdog timeout!
+                m_disp.logInfo<100>("Sent %u bytes of %u [%.0f%%]", sentBytes, contentLength, (sentBytes*100.0)/contentLength);
+                sentBytes += toSend;
+                // Read response
+                if (!rx_(rxBuf, 1)) {
+                    m_disp.logError(F("OTA: No response for sent packet!"));
+                    return false;
+                }
+                skip = rxBuf[0] == R_SKIP;
+                if (skip) {
+                    if (!rx_(rxBuf, 4)) {
+                        m_disp.logError(F("OTA: No skip size received!"));
+                        return false;
+                    }
+                    toSend = MIN(bytesToInt(rxBuf), contentLength - sentBytes);
+                } else 
+                if (rxBuf[0] == R_ACK) {
+                    toSend = MIN(PACKET_SIZE, contentLength - sentBytes);
+                } else {
+                    m_disp.logError(F("OTA: Unexpected response!"));
+                    return false;
+                }
             }
-        }
-    } // End the OTA baud rate session
+        } // End the OTA baud rate session
+    } // End the display serial lock session
     // Do a new scan since the new display firmware might have a different baud rate
     bool success = !fillupMode;
     if (success) {
-        uint32_t prefBaud = m_disp.getBaudRate(); 
-        m_disp.scanBaudRate(prefBaud);
+        m_disp.logInfo("Display firmware updated, scanning for new baud rate...");
+        tDelay(10000, true); // Wait a bit for the display to reboot and be ready for new commands
+        // Most probably the same as before
+        uint32_t preferredBaud = m_disp.getBaudRate();
+        m_disp.scanBaudRate(preferredBaud);
     }
     return success;
 }
@@ -121,10 +128,10 @@ bool EmNextionOtaUpdater::rx_(char* buf, size_t size) {
     return buf_pos == size;
 }
 
-bool EmNextionOtaUpdater::uploadPacket_(EmStreamRx& client, 
-                                        size_t size,
-                                        bool& fillupMode, 
-                                        bool skip) {
+size_t EmNextionOtaUpdater::uploadPacket_(EmStreamRx& client, 
+                                          size_t size,
+                                          bool& fillupMode, 
+                                          bool skip) {
     // The uart chunk used to optimize serial transmission.
     const size_t chunkSize = 512;
     char chunk[chunkSize];
@@ -158,7 +165,6 @@ bool EmNextionOtaUpdater::uploadPacket_(EmStreamRx& client,
                 sentBytes += m_disp.m_serial.write(chunk, toSend);
             }  
         } 
-        m_disp.logInfo<100>("Sent %u bytes of %u", sentBytes, size);
     }
-    return true;
+    return sentBytes;
 }

@@ -41,6 +41,12 @@ bool EmNextion::scanBaudRate(uint32_t preferredBaud) const {
             }
         }
     }
+    // No display found, set the preferred baudrate (if any) and return false
+    if (preferredBaud == 0) {
+        preferredBaud = 9600; // Default to 9600 if no preferred baud was provided
+    }
+    logError<100>("Display not found, setting baud at %s", preferredBaud);
+    m_serial.setBaudRate(preferredBaud);
     return false;
 }
 
@@ -117,9 +123,9 @@ EmNextionStatus EmNextion::getStatus() {
         // Get the active page, in root mode we get 0xFF 0xFF
         sendCmdParam_("get dp", true);
         sendCmdEnd_();
-        tDelay(10, true);
-        char resp[10];
-        if (m_serial.readBytes(resp, 18, 200) > 5) {
+        const uint8_t respLen = 8;
+        char resp[respLen];
+        if (m_serial.readBytes(resp, respLen, 200) >= 3) {
             m_serial.flushRxBuffer();
             if (resp[0] == 0x71) {
                 if (resp[1] == 0xFF && resp[2] == 0xFF) {
