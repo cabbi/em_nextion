@@ -25,12 +25,13 @@ bool EmNextion::scanBaudRate(uint32_t preferredBaud) const {
     size_t startIndex = preferredBaud != 0 ? 0 : 1;
     for (size_t i=startIndex; i<sizeof(bauds)/sizeof(bauds[0]); i++) {    
         uint32_t currentBaud = bauds[i];    
-        logInfo<100>("Scanning display at %d baud...", currentBaud);    
+        logDebug<100>("Scanning display at %d baud...", currentBaud);    
         m_serial.setBaudRate(currentBaud);
         m_serial.write(msg, sizeof(msg)-1);
         EmStringM res;
         if (recv_('c', res.buffer(), res.capacity(), true, 100) != EmGetValueResult::failed &&
             res.startsWith("omok")) {
+            logInfo<100>("Display found, setting baud at %d", currentBaud);
             return true;
         }
         // Drain any remaining bytes during the suggested timeout between two attempts
@@ -45,7 +46,7 @@ bool EmNextion::scanBaudRate(uint32_t preferredBaud) const {
     if (preferredBaud == 0) {
         preferredBaud = 9600; // Default to 9600 if no preferred baud was provided
     }
-    logError<100>("Display not found, setting baud at %s", preferredBaud);
+    logError<100>("Display not found, setting baud at %d", preferredBaud);
     m_serial.setBaudRate(preferredBaud);
     return false;
 }
