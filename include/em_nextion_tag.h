@@ -33,7 +33,7 @@ public:
     virtual bool setValue(const EmTagValue& value) {
         switch (value.getType()) {
             case EmTagValueType::vt_bool:
-                return nexElement::setValue(value.asBool());
+                return nexElement::setValue(value.asBool() ? 1 : 0);
             case EmTagValueType::vt_int:
                 return nexElement::setValue(value.asInt());
             case EmTagValueType::vt_uint:
