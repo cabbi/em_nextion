@@ -5,6 +5,7 @@
 
 #include "em_defs.h"
 #include "em_log.h"
+#include "em_string.h"
 #include "em_serial.h"
 #include "em_threading.h"
 #include "em_optional.h"
@@ -137,6 +138,13 @@ public:
                                         int32_t& val) const;
 
     // Get text element value.
+    template<size_t max_str_len>
+    EmGetValueResult getTextElementValue(const char* pageName, 
+                                         const char* elementName, 
+                                         EmString<max_str_len>& txt) const {
+        return this->getTextElementValue<max_str_len>(pageName, elementName, txt.buffer());
+    }
+
     template<size_t max_str_len>
     EmGetValueResult getTextElementValue(const char* pageName, 
                                          const char* elementName, 
@@ -552,6 +560,11 @@ public:
     EmNexText(const char* name,
               EmLogLevel logLevel=EmLogLevel::global)
      : EmNexColoredElement<tPage>(name, logLevel) {}
+
+    template<size_t max_str_len>
+    EmGetValueResult getValue(EmString<max_str_len>& value) const {
+        return this->getValue<max_str_len>(value.buffer());
+    }
 
     template<size_t max_str_len>
     EmGetValueResult getValue(char* value) const {
