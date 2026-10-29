@@ -206,6 +206,16 @@ public:
                     const char* elementName, 
                     uint8_t& picId) const;
 
+    // Set the enabled property (e.g. timers)
+    bool setEnabled(const char* pageName, 
+                    const char* elementName, 
+                    bool enabled) const;
+
+    // Set the enabled property (e.g. timers)
+    bool getEnabled(const char* pageName, 
+                    const char* elementName, 
+                    bool& enabled) const;
+
     // Set background color.
     bool setBkColor(const char* pageName, 
                     const char* elementName, 

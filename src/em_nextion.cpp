@@ -179,7 +179,7 @@ EmGetValueResult EmNextion::recv_(uint8_t ackCode,
                                   bool isText,
                                   uint32_t timeoutMs) const
 {
-    bool value_changed = false;
+    bool value_changed=false;
     bool got_ackCode=false;
     bool got_buffer=(len==0);
     uint8_t term_count=0;
@@ -195,6 +195,10 @@ EmGetValueResult EmNextion::recv_(uint8_t ackCode,
             // Still waiting for data?
             else if (!got_buffer) {
                 if (isText && c == 0xFF) {
+                    if (!value_changed) {
+                        // Till now test was same, lets check is previous string has same length!?
+                        value_changed = buf[buf_pos] != 0;
+                    } 
                     buf[buf_pos] = 0;
                     got_buffer = true;    
                     term_count = 1;
@@ -412,6 +416,44 @@ bool EmNextion::getPicture(const char* pageName,
     logDebug<50>("pic: %s -> %d [%s]", 
                  elementName,
                  static_cast<int>(picId),
+                 res ? " [SUCCESS]" : " [FAIL]");
+    return res;
+}
+
+bool EmNextion::setEnabled(const char* pageName, 
+                           const char* elementName, 
+                           bool enabled) const {
+#ifdef EM_MULTITHREAD
+    EmMutexLock lock(m_serialLock);
+#endif
+    bool res = false;
+    if (sendSetCmd_(pageName, elementName, "en", enabled ? 1 : 0)) {
+        res = ack_(ACK_CMD_SUCCEED);
+    }
+    logDebug<50>("pic: %s -> %s [%s]", 
+                 elementName,
+                 enabled ? "TRUE" : "FALSE",
+                 (res ? " [SUCCESS]" : " [FAIL]"));
+    return res;
+}
+
+bool EmNextion::getEnabled(const char* pageName, 
+                           const char* elementName, 
+                           bool& enabled) const {
+#ifdef EM_MULTITHREAD
+    EmMutexLock lock(m_serialLock);
+#endif
+    bool res = false;
+    if (sendGetCmd_(pageName, elementName, "en")) {
+        int32_t val;
+        res = getNumber_(val) != EmGetValueResult::failed;
+        if (res) {
+            enabled = val!=0;
+        }
+    }
+    logDebug<50>("pic: %s -> %s [%s]", 
+                 elementName,
+                 enabled ? "TRUE" : "FALSE",
                  res ? " [SUCCESS]" : " [FAIL]");
     return res;
 }
