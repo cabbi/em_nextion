@@ -21,7 +21,12 @@ public:
         T val = T();
         EmGetValueResult res = nexElement::getValue(val);
         if (EmGetValueResult::failed != res) {
-            value.setValue(val, true);
+            EmTagValue newValue(val);
+            if (newValue != value) {
+                value.setValue(val, true);
+                return EmGetValueResult::succeedNotEqualValue;
+            }
+            return EmGetValueResult::succeedEqualValue;
         }
         return res;
     }
